@@ -5,15 +5,9 @@ import { Input } from "@/components/ui/input"
 import * as React from "react"
 
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-
-import {
   ColumnDef,
   ColumnFiltersState,
+  ColumnSizingState,
   SortingState,
   flexRender,
   VisibilityState,
@@ -53,6 +47,7 @@ export function DataTable<TData, TValue>({
 
   const [rowSelection, setRowSelection] = React.useState({})
 
+
   const table = useReactTable({
     data,
     columns,
@@ -74,59 +69,26 @@ export function DataTable<TData, TValue>({
 
   return (
     <div>
-      <div className="flex-1 text-sm text-muted-foreground">
-        {table.getFilteredSelectedRowModel().rows.length} of{" "}
-        {table.getFilteredRowModel().rows.length} row(s) selected.
+      <div className="py-4 text-sm text-muted-foreground">
+        <p><strong>* Rotavirus 3rd dose alternate schedule</strong></p>
+        <p><strong>** Vitamin A is given after every 6 months up to 5 years and lactating months too.</strong></p>
+        <p><strong>*** One Dose Annually</strong></p>
       </div>
-
       <div className="flex items-center py-4">
         <Input
-          placeholder="Filter by age"
-          value={(table.getColumn("age")?.getFilterValue() as string) ?? ""}
+          placeholder="Search for vaccine"
+          value={(table.getColumn("vaccine")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("age")?.setFilterValue(event.target.value)
+            table.getColumn("vaccine")?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
       </div>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="ml-auto">
-            Columns
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {
-          table
-            .getAllColumns()
-            .filter(
-              (column) => column.getCanHide()
-            )
-            .map((column) => {
-              return (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) =>
-                    column.toggleVisibility(!!value)
-                  }
-                >
-                  {column.id}
-                </DropdownMenuCheckboxItem>
-              )
-            }
-            )
-          }
-        </DropdownMenuContent>
-      </DropdownMenu>
-
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="grid grid-cols-3">
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id}>
@@ -148,6 +110,7 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="grid grid-cols-3 gap-2"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

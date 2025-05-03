@@ -1,8 +1,10 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown } from "lucide-react"
+import { FilterIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
+import { Checkbox } from "./ui/checkbox"
 
 export type Vaccination = {
   id: number
@@ -14,15 +16,61 @@ export type Vaccination = {
 export const columns: ColumnDef<Vaccination>[] = [
   {
     accessorKey: "age",
-    header: ({ column }) => {
+    filterFn: (row, columnId, filterValue: string[]) => {
+      return filterValue.includes(row.getValue(columnId))
+    },
+    header: ({ column, table }) => {
+      const data = table.getPreFilteredRowModel().rows.map(row => row.original)
+      const uniqueAges = Array.from(new Set(data.map(v => v.age)))
+      const selected = (column.getFilterValue() as string[]) ?? []
+     
+
+      const toggleAge = (age: string) => {
+        const updated = selected.includes(age)
+          ? selected.filter(a => a !== age)
+          : [...selected, age]
+      
+        column.setFilterValue(updated.length > 0 ? updated : undefined)
+      }      
+
       return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Age
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" className="flex items-center space-x-2">
+              <span>Age</span>
+              <FilterIcon className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-56 space-y-2 p-4 max-h-72 overflow-y-auto"
+            align="start"
+            side="bottom"
+            sideOffset={8}
+          >
+             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => column.setFilterValue(undefined)}
+              className="w-full mt-2"
+            >
+              Clear Filter
+            </Button>
+            <div className="space-y-1">
+              {uniqueAges.map(age => (
+                <div key={age} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={age}
+                    checked={selected.includes(age)}
+                    onCheckedChange={() => toggleAge(age)}
+                  />
+                  <label htmlFor={age} className="text-sm">
+                    {age}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       )
     },
 
