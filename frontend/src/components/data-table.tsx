@@ -3,11 +3,11 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import * as React from "react"
+import { ColumnResizer } from "./ColumnResizer"
 
 import {
   ColumnDef,
   ColumnFiltersState,
-  ColumnSizingState,
   SortingState,
   flexRender,
   VisibilityState,
@@ -54,6 +54,7 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
+    columnResizeMode: "onChange",
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
@@ -84,20 +85,29 @@ export function DataTable<TData, TValue>({
           className="max-w-sm"
         />
       </div>
-      <div className="rounded-md border">
-        <Table>
+      <div className="overflow-x-auto w-full rounded-md border">
+        <Table className="min-w-full table-fixed">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="grid grid-cols-3">
+              <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead 
+                    key={header.id} 
+                    className="relative border border-gray-200 px-2 py-1
+                              truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                    style={{
+                      width: header.getSize(),
+                      minWidth: header.getSize(),
+                    }}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
                             header.getContext()
                           )}
+                    <ColumnResizer header={header} />
                     </TableHead>
                   )
                 })}
@@ -110,10 +120,16 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="grid grid-cols-3 gap-2"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id}
+                    style={{
+                      width: cell.column.getSize(),
+                      minWidth: cell.column.getSize(),
+                    }}
+                    className="truncate whitespace-nowrap overflow-hidden text-ellipsis 
+                              border border-gray-200 px-2 py-1"
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

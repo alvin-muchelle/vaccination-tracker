@@ -1,5 +1,3 @@
-"use client"
-
 import { ColumnDef } from "@tanstack/react-table"
 import { FilterIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -7,7 +5,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
 import { Checkbox } from "./ui/checkbox"
 
 export type Vaccination = {
-  id: number
   age: string
   vaccine: string
   protection_against: string
@@ -16,6 +13,9 @@ export type Vaccination = {
 export const columns: ColumnDef<Vaccination>[] = [
   {
     accessorKey: "age",
+    size: 30,
+    minSize: 30,
+    maxSize: 60,
     filterFn: (row, columnId, filterValue: string[]) => {
       return filterValue.includes(row.getValue(columnId))
     },
@@ -23,7 +23,6 @@ export const columns: ColumnDef<Vaccination>[] = [
       const data = table.getPreFilteredRowModel().rows.map(row => row.original)
       const uniqueAges = Array.from(new Set(data.map(v => v.age)))
       const selected = (column.getFilterValue() as string[]) ?? []
-     
 
       const toggleAge = (age: string) => {
         const updated = selected.includes(age)
@@ -73,7 +72,6 @@ export const columns: ColumnDef<Vaccination>[] = [
         </Popover>
       )
     },
-
     sortingFn: (rowA, rowB) => {
       const orderValue = (age: string): number => {
         if (age.toLowerCase() === "birth") return 0;
@@ -87,7 +85,6 @@ export const columns: ColumnDef<Vaccination>[] = [
           "years": 52,
         };
     
-        // Match patterns like "15–18 months", "1–2 years", "6 months"
         const rangeRegex = /^(\d+)[–-](\d+)\s*(\w+)/;
         const singleRegex = /^(\d+)\s*(\w+)/;
     
@@ -105,7 +102,7 @@ export const columns: ColumnDef<Vaccination>[] = [
           return parseInt(num) * (unitWeights[unit.toLowerCase()] || 1000);
         }
     
-        return 9999; // fallback for unrecognized patterns
+        return 9999;
       };
     
       return orderValue(rowA.getValue("age")) - orderValue(rowB.getValue("age"));
@@ -115,9 +112,30 @@ export const columns: ColumnDef<Vaccination>[] = [
   {
     accessorKey: "vaccine",
     header: "Vaccine",
+    size: 70,
+    minSize: 70,
+    maxSize: 100
   },
+
   {
     accessorKey: "protection_against",
     header: "Protection Against",
-  },
+    minSize: 200,
+    cell: ({ row }) => {
+      const value = row.getValue("protection_against");
+      if (typeof value !== "string") return null;
+  
+      const items = value.split(', ');
+  
+      return items.length > 1 ? (
+        <ul className="list-disc list-inside text-left">
+          {items.map((item, index) => (
+            <li key={index}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <div className="text-left">{value}</div>
+      );
+    }
+  }  
 ]
