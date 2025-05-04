@@ -1,11 +1,41 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
+
+// set up email 
+const nodemailer = require('nodemailer');
+
+async function sendTestEmail(to, password) {
+  const testAccount = await nodemailer.createTestAccount();
+
+  const transporter = nodemailer.createTransport({
+    host: testAccount.smtp.host,
+    port: testAccount.smtp.port,
+    secure: testAccount.smtp.secure, // true for 465, false for other ports
+    auth: {
+      user: testAccount.user,
+      pass: testAccount.pass,
+    },
+  });
+
+  const info = await transporter.sendMail({
+    from: '"Vaccination Tracker" <no-reply@vtracker.com>',
+    to,
+    subject: 'Your Temporary Password',
+    text: `Welcome to the Vaccination Tracker.\n\nYour temporary password is: ${password}`,
+  });
+
+  console.log("Email sent! Preview it here:", nodemailer.getTestMessageUrl(info));
+}
+
 
 // Initialize express app
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT;
 
 // Middleware
 app.use(cors());
@@ -24,6 +54,126 @@ const pool = new Pool({
 pool.connect()
   .then(() => console.log('Database connected successfully'))
   .catch(err => console.log('Error connecting to DB:', err));
+
+// Signup Route
+app.post('/api/signup', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required.' });
+  }
+
+  try {
+    // Check if user exists
+    const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (userCheck.rows.length > 0) {
+      return res.status(409).json({ message: 'User already exists. Please log in.' });
+    }
+
+    // Generate a random password
+    const rawPassword = crypto.randomBytes(8).toString('hex'); // 16-character password
+
+    // Hash the password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(rawPassword, saltRounds);
+
+    // Insert user into database
+    await pool.query(
+      'INSERT INTO users (email, hashed_password) VALUES ($1, $2)',
+      [email, hashedPassword]
+    );
+
+    // Send the temporary password via email
+    await sendTestEmail(email, rawPassword);
+
+    res.status(201).json({
+      message: 'User registered successfully. A temporary password has been emailed.',
+    });
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ error: 'Server error during signup.' });
+  }
+});
+
+// Reset Password Route
+app.post('/api/reset-password', async (req, res) => {
+  const { email, tempPassword, newPassword } = req.body;
+
+  try {
+    // Get the user by email
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if the temp password matches
+    const isMatch = await bcrypt.compare(tempPassword, user.hashed_password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Incorrect temporary password' });
+    }
+
+    // Hash the new password
+    const newHashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the password
+    await pool.query('UPDATE users SET hashed_password = $1 WHERE email = $2', [newHashedPassword, email]);
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    res.status(200).json({
+      message: 'Password updated successfully',
+      token,
+      userId: user.id,
+    });
+    
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Login Route
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // Fetch user by email
+    const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = userResult.rows[0];
+
+    if (!user) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    // Compare entered password with hashed password
+    const isPasswordValid = await bcrypt.compare(password, user.hashed_password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    res.status(200).json({
+      message: 'Login successful',
+      token,
+      userId: user.id,
+    });
+
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error during login' });
+  }
+});
 
 // Baby and Vaccination Routes
 app.get('/api/babies', async (req, res) => {
