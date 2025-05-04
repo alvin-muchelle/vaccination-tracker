@@ -15,7 +15,7 @@ async function sendTestEmail(to, password) {
   const transporter = nodemailer.createTransport({
     host: testAccount.smtp.host,
     port: testAccount.smtp.port,
-    secure: testAccount.smtp.secure, // true for 465, false for other ports
+    secure: testAccount.smtp.secure,
     auth: {
       user: testAccount.user,
       pass: testAccount.pass,
@@ -97,46 +97,35 @@ app.post('/api/signup', async (req, res) => {
 
 // Reset Password Route
 app.post('/api/reset-password', async (req, res) => {
-  const { email, tempPassword, newPassword } = req.body;
+  const authHeader = req.headers.authorization;
+  const { newPassword } = req.body;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.split(' ')[1];
 
   try {
-    // Get the user by email
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    const user = result.rows[0];
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Check if the temp password matches
-    const isMatch = await bcrypt.compare(tempPassword, user.hashed_password);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Incorrect temporary password' });
-    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const email = decoded.email;
 
     // Hash the new password
     const newHashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update the password
-    await pool.query('UPDATE users SET hashed_password = $1 WHERE email = $2', [newHashedPassword, email]);
-
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+    // Update the password in the database
+    await pool.query(
+      'UPDATE users SET hashed_password = $1, must_reset_password = false WHERE email = $2',
+      [newHashedPassword, email]
     );
 
-    res.status(200).json({
-      message: 'Password updated successfully',
-      token,
-      userId: user.id,
-    });
-    
+    res.status(200).json({ message: 'Password updated successfully' });
   } catch (error) {
     console.error('Reset password error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(401).json({ error: 'Invalid or expired token' });
   }
 });
+
 
 // Login Route
 app.post('/api/login', async (req, res) => {
@@ -167,6 +156,7 @@ app.post('/api/login', async (req, res) => {
       message: 'Login successful',
       token,
       userId: user.id,
+      mustResetPassword: user.must_reset_password, // <-- ✅ Include this line
     });
 
   } catch (err) {
@@ -174,6 +164,7 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Server error during login' });
   }
 });
+
 
 // Baby and Vaccination Routes
 app.get('/api/babies', async (req, res) => {
