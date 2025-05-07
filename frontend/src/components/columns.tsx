@@ -8,6 +8,7 @@ export type Vaccination = {
   age: string
   vaccine: string
   protection_against: string
+  date_to_be_administered?: string
 }
 
 export const columns: ColumnDef<Vaccination>[] = [
@@ -137,5 +138,15 @@ export const columns: ColumnDef<Vaccination>[] = [
         <div className="text-left">{value}</div>
       );
     }
-  }  
+  },
+  
+  {
+    accessorKey: "date_to_be_administered",
+    header: "Date to be Administered",
+    cell: ({ row }) => {
+      const date = row.getValue("date_to_be_administered") as string
+      return <span>{date}</span>
+    }
+  }
+    
 ]

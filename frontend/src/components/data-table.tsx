@@ -3,7 +3,10 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import * as React from "react"
+import { useState } from 'react';
 import { ColumnResizer } from "./ColumnResizer"
+import { calculateVaccinationSchedule } from "./calculateSchedule"
+
 
 import {
   ColumnDef,
@@ -26,16 +29,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table.tsx"
+import { Vaccination } from "./columns";
 
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
+interface DataTableProps {
+  columns: ColumnDef<Vaccination, any>[]
+  data: Vaccination[]
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable({
   columns,
   data,
-}: DataTableProps<TData, TValue>) {
+}: DataTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -47,10 +51,18 @@ export function DataTable<TData, TValue>({
 
   const [rowSelection, setRowSelection] = React.useState({})
 
+  const [birthDate, setBirthDate] = useState<string>('');
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setBirthDate(e.target.value);
+  };
+
+  const parsedBirthDate = birthDate ? new Date(birthDate) : new Date();
+  const schedule = calculateVaccinationSchedule(data, parsedBirthDate);
 
   const table = useReactTable({
-    data,
     columns,
+    data: schedule,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
@@ -76,6 +88,13 @@ export function DataTable<TData, TValue>({
         <p><strong>*** One Dose Annually</strong></p>
       </div>
       <div className="flex items-center py-4">
+      <Input
+        type="date"
+        value={birthDate}
+        onChange={handleDateChange}
+        className="max-w-xs"
+      />
+
         <Input
           placeholder="Search for vaccine"
           value={(table.getColumn("vaccine")?.getFilterValue() as string) ?? ""}
