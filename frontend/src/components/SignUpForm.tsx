@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
@@ -21,30 +19,23 @@ const emailSchema = z.object({
   email: z.string().email("Enter a valid email"),
 })
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-})
+interface Props {
+  onSignupSuccess: (token: string) => void
+  onSwitchToLogin: () => void
+}
 
-export function SignupForm({
-  onLoginSuccess,
-}: {
-  onLoginSuccess: (token: string, mustResetPassword: boolean) => void
-}) {
+export function SignupForm({ onSignupSuccess, onSwitchToLogin }: Props) {
   const [message, setMessage] = useState("")
-  const [emailSent, setEmailSent] = useState(false)
+  const [sending, setSending] = useState(false)
 
-  const emailForm = useForm<z.infer<typeof emailSchema>>({
+  const form = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
     defaultValues: { email: "" },
   })
 
-  const loginForm = useForm<z.infer<typeof loginSchema>>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
-  })
-
   const handleSendEmail = async (values: z.infer<typeof emailSchema>) => {
+    setSending(true)
+    setMessage("")
     try {
       const res = await fetch("http://localhost:5000/api/signup", {
         method: "POST",
@@ -52,37 +43,18 @@ export function SignupForm({
         body: JSON.stringify({ email: values.email }),
       })
 
+      const data = await res.json()
       if (res.ok) {
         setMessage("Temporary password sent. Check your email.")
-        setEmailSent(true)
-        loginForm.setValue("email", values.email) 
+        onSignupSuccess(data.token)
       } else {
-        const data = await res.json()
         setMessage(data.message || "Signup failed.")
       }
     } catch (err) {
       console.error(err)
       setMessage("Error sending email.")
-    }
-  }
-
-  const handleLogin = async (values: z.infer<typeof loginSchema>) => {
-    try {
-      const res = await fetch("http://localhost:5000/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      })
-
-      const data = await res.json()
-      if (res.ok && data.token) {
-        onLoginSuccess(data.token, data.mustResetPassword ?? false)
-      } else {
-        setMessage("Login failed. Check your temporary password.")
-      }
-    } catch (err) {
-      console.error(err)
-      setMessage("Error logging in.")
+    } finally {
+      setSending(false)
     }
   }
 
@@ -90,71 +62,46 @@ export function SignupForm({
     <div className="max-w-md mx-auto mt-10">
       <h2 className="text-xl font-semibold mb-4">Sign Up</h2>
 
-      {!emailSent ? (
-        <Form {...emailForm}>
-          <form
-            onSubmit={emailForm.handleSubmit(handleSendEmail)}
-            className="space-y-4"
-          >
-            <FormField
-              control={emailForm.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="you@example.com" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    We'll send you a temporary password.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit">Send Temporary Password</Button>
-          </form>
-        </Form>
-      ) : (
-        <Form {...loginForm}>
-          <form
-            onSubmit={loginForm.handleSubmit(handleLogin)}
-            className="space-y-4"
-          >
-            <FormField
-              control={loginForm.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input disabled {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={loginForm.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Temporary Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit">Log In</Button>
-          </form>
-        </Form>
-      )}
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(handleSendEmail)}
+          className="space-y-4"
+        >
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="you@example.com" {...field} />
+                </FormControl>
+                <FormDescription>
+                  We'll send you a temporary password to get started.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit" disabled={sending}>
+            {sending ? "Sending..." : "Send Temporary Password"}
+          </Button>
+        </form>
+      </Form>
 
       {message && (
         <p className="mt-4 text-center text-sm text-green-600">{message}</p>
       )}
+
+      <p className="mt-4 text-center text-sm">
+        Already have an account?{" "}
+        <button
+          onClick={onSwitchToLogin}
+          className="underline text-blue-500 hover:text-blue-700"
+        >
+          Log in
+        </button>
+      </p>
     </div>
   )
 }

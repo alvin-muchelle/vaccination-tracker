@@ -78,16 +78,20 @@ app.post('/api/signup', async (req, res) => {
     const hashedPassword = await bcrypt.hash(rawPassword, saltRounds);
 
     // Insert user into database
-    await pool.query(
-      'INSERT INTO users (email, hashed_password) VALUES ($1, $2)',
+    const newUser = await pool.query(
+      'INSERT INTO users (email, hashed_password) VALUES ($1, $2) RETURNING id',
       [email, hashedPassword]
     );
 
     // Send the temporary password via email
     await sendTestEmail(email, rawPassword);
 
+    // Generate a short-lived token for password reset
+    const token = jwt.sign({ userId: newUser.rows[0].id, email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
     res.status(201).json({
       message: 'User registered successfully. A temporary password has been emailed.',
+      token
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -126,7 +130,6 @@ app.post('/api/reset-password', async (req, res) => {
   }
 });
 
-
 // Login Route
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
@@ -146,6 +149,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Generate a long-lived token for general usage
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET,
@@ -156,35 +160,133 @@ app.post('/api/login', async (req, res) => {
       message: 'Login successful',
       token,
       userId: user.id,
-      mustResetPassword: user.must_reset_password, // <-- ✅ Include this line
+      mustResetPassword: user.must_reset_password,
     });
-
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Server error during login' });
   }
 });
 
+// Middleware for JWT verification
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader?.split(' ')[1];
 
-// Baby and Vaccination Routes
-app.get('/api/babies', async (req, res) => {
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+}
+
+// Create/Update Profile Route
+app.post('/api/profile', authenticateToken, async (req, res) => {
+  const { fullName, phoneNumber, babyName, dateOfBirth, gender } = req.body;
+  const userId = req.user.userId;
+
+  const genderNormalized = gender.toLowerCase();
+
+  const allowedGenders = ['male', 'female'];
+  if (!allowedGenders.includes(genderNormalized)) {
+    return res.status(400).json({ error: 'Invalid gender. Must be "Male" or "Female".' });
+  }
+
   try {
-    const result = await pool.query('SELECT * FROM babies');
-    res.json(result.rows);
+    // Check if mother exists
+    const motherResult = await pool.query('SELECT id FROM mothers WHERE user_id = $1', [userId]);
+
+    let motherId;
+    if (motherResult.rows.length === 0) {
+      // Insert new mother
+      const insertMother = await pool.query(
+        `INSERT INTO mothers (user_id, full_name, phone_number)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [userId, fullName, phoneNumber]
+      );
+      motherId = insertMother.rows[0].id;
+    } else {
+      // Update existing mother
+      motherId = motherResult.rows[0].id;
+      await pool.query(
+        `UPDATE mothers SET full_name = $1, phone_number = $2
+         WHERE user_id = $3`,
+        [fullName, phoneNumber, userId]
+      );
+    }
+
+    // Check if a baby already exists for this mother
+    const babyResult = await pool.query('SELECT id FROM babies WHERE mother_id = $1', [motherId]);
+
+    if (babyResult.rows.length === 0) {
+      // Insert baby
+      await pool.query(
+        `INSERT INTO babies (mother_id, baby_name, date_of_birth, gender)
+         VALUES ($1, $2, $3, $4)`,
+        [motherId, babyName, dateOfBirth, genderNormalized]
+      );
+    } else {
+      // Update existing baby
+      await pool.query(
+        `UPDATE babies SET baby_name = $1, date_of_birth = $2, gender = $3
+         WHERE mother_id = $4`,
+        [babyName, dateOfBirth, genderNormalized, motherId]
+      );
+    }
+
+    res.status(200).json({ message: 'Profile saved successfully' });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error fetching babies' });
+    console.error('Profile error:', error);
+    res.status(500).json({ error: 'Server error while saving profile' });
   }
 });
 
-app.get('/api/vaccinations/:baby_id', async (req, res) => {
-  const { baby_id } = req.params;
+// Get Profile Route
+app.get('/api/profile', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+
   try {
-    const result = await pool.query('SELECT * FROM vaccinations WHERE baby_id = $1', [baby_id]);
-    res.json(result.rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error fetching vaccinations' });
+    // Get user data
+    const userResult = await pool.query('SELECT must_reset_password FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
+
+    // Get mother's profile
+    const motherResult = await pool.query(
+      'SELECT id, full_name, phone_number FROM mothers WHERE user_id = $1',
+      [userId]
+    );
+
+    if (motherResult.rows.length === 0) {
+      return res.status(200).json({
+        mustResetPassword: user.must_reset_password,
+        profileComplete: false,
+        mother: null,
+        baby: null,
+      });
+    }
+
+    const mother = motherResult.rows[0];
+
+    // Get baby profile
+    const babyResult = await pool.query(
+      'SELECT baby_name, date_of_birth, gender FROM babies WHERE mother_id = $1',
+      [mother.id]
+    );
+
+    const baby = babyResult.rows[0] || null;
+
+    res.status(200).json({
+      mustResetPassword: user.must_reset_password,
+      profileComplete: !!(mother.full_name && mother.phone_number && baby?.baby_name && baby?.date_of_birth && baby?.gender),
+      mother,
+      baby,
+    });
+  } catch (err) {
+    console.error('GET /api/profile error:', err);
+    res.status(500).json({ error: 'Error fetching profile' });
   }
 });
 
@@ -210,7 +312,6 @@ app.get('/api/vaccination-schedule/:age', async (req, res) => {
     res.status(500).json({ error: 'Error fetching schedule for given age' });
   }
 });
-
 
 // Start the server
 app.listen(port, () => {
