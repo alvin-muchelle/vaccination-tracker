@@ -6,6 +6,9 @@ import * as React from "react"
 import { useState } from 'react';
 import { ColumnResizer } from "./ColumnResizer"
 import { calculateVaccinationSchedule } from "./calculateSchedule"
+import { CalendarIcon } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 
 import {
   ColumnDef,
@@ -33,38 +36,62 @@ import { Vaccination } from "./columns";
 interface DataTableProps {
   columns: ColumnDef<Vaccination, any>[]
   data: Vaccination[]
+  initialBirthDate?: string
+  babyId: number
+  authToken: string
 }
 
 export function DataTable({
   columns,
   data,
+  initialBirthDate,
+  babyId,
+  authToken,
 }: DataTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
-
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
-
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
+  const [pagination, setPagination] = React.useState({
+      pageIndex: 0,
+      pageSize: 10,
+    })
 
-  const [birthDate, setBirthDate] = useState<string>('');
+  // initialize birthDate input with prop if provided
+  const [birthDate, setBirthDate] = useState<string>(initialBirthDate ?? "")
+  const [popoverOpen, setPopoverOpen] = useState(false)
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBirthDate(e.target.value);
-  };
+  // only compute schedule when we have a valid birthDate
+  const parsedBirthDate = birthDate ? new Date(birthDate) : null;
+  const schedule = React.useMemo(() => {
+    return parsedBirthDate
+      ? calculateVaccinationSchedule(data, parsedBirthDate)
+      : [];
+  }, [data, parsedBirthDate]);
 
-  const parsedBirthDate = birthDate ? new Date(birthDate) : new Date();
-  const schedule = calculateVaccinationSchedule(data, parsedBirthDate);
+  const handleDateSelect = async (day: Date | undefined) => {
+    if (!day) return;
+    const iso = day.toISOString().split("T")[0];
+    setBirthDate(iso);
+    setPopoverOpen(false);
 
+    await fetch(`http://localhost:5000/api/baby/${babyId}/birth-date`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ birthDate: iso }),
+    });
+  }
+  
   const table = useReactTable({
     columns,
     data: schedule,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
+    onPaginationChange: setPagination,
     columnResizeMode: "onChange",
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
@@ -76,9 +103,11 @@ export function DataTable({
       columnFilters,
       columnVisibility,
       rowSelection,
+      pagination,
     },
+    autoResetPageIndex: false,
   })
-
+  
   return (
     <div>
       <div className="py-4 text-sm text-muted-foreground">
@@ -87,19 +116,32 @@ export function DataTable({
         <p><strong>*** One Dose Annually</strong></p>
       </div>
       <div className="flex items-center py-4">
-      <Input
-        type="date"
-        value={birthDate}
-        onChange={handleDateChange}
-        className="max-w-xs"
-      />
-
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className="max-w-xs w-[220px] justify-start text-left font-normal text-muted-foreground"
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              Pick new birth date
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2 space-y-2" align="start">
+            <p className="text-sm text-muted-foreground px-1">
+              Has the baby’s birth date changed?
+            </p>
+            <Calendar
+              mode="single"
+              selected={birthDate ? new Date(birthDate) : undefined}
+              onSelect={handleDateSelect}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
         <Input
           placeholder="Search for vaccine"
           value={(table.getColumn("vaccine")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("vaccine")?.setFilterValue(event.target.value)
-          }
+          onChange={(e) => table.getColumn("vaccine")?.setFilterValue(e.target.value)}
           className="max-w-sm"
         />
       </div>
@@ -111,13 +153,9 @@ export function DataTable({
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead 
-                    key={header.id} 
-                    className="relative border border-gray-200 px-2 py-1
-                              truncate whitespace-nowrap overflow-hidden text-ellipsis"
-                    style={{
-                      width: header.getSize(),
-                      minWidth: header.getSize(),
-                    }}
+                      key={header.id} 
+                      className="relative border border-gray-200 px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                      style={{ width: header.getSize(), minWidth: header.getSize() }}
                     >
                       {header.isPlaceholder
                         ? null
@@ -125,7 +163,7 @@ export function DataTable({
                             header.column.columnDef.header,
                             header.getContext()
                           )}
-                    <ColumnResizer header={header} />
+                      <ColumnResizer header={header} />
                     </TableHead>
                   )
                 })}
@@ -140,13 +178,10 @@ export function DataTable({
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}
-                    style={{
-                      width: cell.column.getSize(),
-                      minWidth: cell.column.getSize(),
-                    }}
-                    className="truncate whitespace-nowrap overflow-hidden text-ellipsis 
-                              border border-gray-200 px-2 py-1"
+                    <TableCell 
+                      key={cell.id}
+                      style={{ width: cell.column.getSize(), minWidth: cell.column.getSize() }}
+                      className="truncate whitespace-nowrap overflow-hidden text-ellipsis border border-gray-200 px-2 py-1"
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>

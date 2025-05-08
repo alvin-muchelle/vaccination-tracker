@@ -26,7 +26,7 @@ export async function sendTemporaryPassword(email, tempPassword) {
     subject: 'Your Temporary Password',
     html: `
       <p>Hello,</p>
-      <p>Welcome to Chanjo! Here’s your temporary password:</p>
+      <p>Welcome to Chanjo! Here's your temporary password:</p>
       <p><strong>${tempPassword}</strong></p>
       <p>Please log in and reset your password within 15 minutes.</p>
       <p>Best,<br/>Chanjo</p>
@@ -200,7 +200,7 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Create/Update Profile Route
+// Create/Update Profile Route - UPDATED
 app.post('/api/profile', authenticateToken, async (req, res) => {
   const { fullName, phoneNumber, babyName, dateOfBirth, gender } = req.body;
   const userId = req.user.userId;
@@ -213,6 +213,15 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
   }
 
   try {
+    // Validate and parse date
+    if (!dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+    }
+    const parsedDate = new Date(dateOfBirth + 'T00:00:00Z');
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date' });
+    }
+
     // Check if mother exists
     const motherResult = await pool.query('SELECT id FROM mothers WHERE user_id = $1', [userId]);
 
@@ -243,14 +252,14 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
       await pool.query(
         `INSERT INTO babies (mother_id, baby_name, date_of_birth, gender)
          VALUES ($1, $2, $3, $4)`,
-        [motherId, babyName, dateOfBirth, genderNormalized]
+        [motherId, babyName, parsedDate, genderNormalized]
       );
     } else {
       // Update existing baby
       await pool.query(
         `UPDATE babies SET baby_name = $1, date_of_birth = $2, gender = $3
          WHERE mother_id = $4`,
-        [babyName, dateOfBirth, genderNormalized, motherId]
+        [babyName, parsedDate, genderNormalized, motherId]
       );
     }
 
@@ -262,7 +271,7 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Get Profile Route
+// Get Profile Route - UPDATED
 app.get('/api/profile', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
@@ -282,7 +291,6 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
         mustResetPassword: user.must_reset_password,
         profileComplete: false,
         mother: null,
-        baby: null,
       });
     }
 
@@ -290,21 +298,81 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
 
     // Get baby profile
     const babyResult = await pool.query(
-      'SELECT baby_name, date_of_birth, gender FROM babies WHERE mother_id = $1',
+      'SELECT id, baby_name, date_of_birth, gender FROM babies WHERE mother_id = $1',
       [mother.id]
     );
 
     const baby = babyResult.rows[0] || null;
 
-    res.status(200).json({
+    // Format response with date as YYYY-MM-DD string
+    const response = {
       mustResetPassword: user.must_reset_password,
       profileComplete: !!(mother.full_name && mother.phone_number && baby?.baby_name && baby?.date_of_birth && baby?.gender),
-      mother,
-      baby,
-    });
+      mother: {
+        ...mother,
+        full_name: mother.full_name // Keep consistent naming
+      },
+      baby: baby ? {
+        ...baby,
+        date_of_birth: baby.date_of_birth ? baby.date_of_birth.toISOString().split('T')[0] : null
+      } : null
+    };
+
+    res.status(200).json(response);
   } catch (err) {
     console.error('GET /api/profile error:', err);
     res.status(500).json({ error: 'Error fetching profile' });
+  }
+});
+
+// Update Baby's Date of Birth - UPDATED
+app.put('/api/baby/:id/birth-date', authenticateToken, async (req, res) => {
+  const motherUserId = req.user.userId;
+  const babyId = parseInt(req.params.id, 10);
+  const { birthDate } = req.body;
+
+  if (!birthDate) {
+    return res.status(400).json({ error: 'birthDate is required' });
+  }
+
+  // Validate date format
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+    return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+  }
+
+  try {
+    // Parse as UTC date to avoid timezone issues
+    const parsedDate = new Date(birthDate + 'T00:00:00Z');
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date' });
+    }
+
+    // ensure this baby belongs to the authenticated user's mother record
+    const m = await pool.query(
+      `SELECT b.id
+       FROM babies b
+       JOIN mothers m ON m.id = b.mother_id
+       WHERE b.id = $1 AND m.user_id = $2`,
+      [babyId, motherUserId]
+    );
+    
+    if (m.rows.length === 0) {
+      return res.status(404).json({ error: 'Baby not found or unauthorized' });
+    }
+
+    // perform the update with the parsed date
+    await pool.query(
+      'UPDATE babies SET date_of_birth = $1 WHERE id = $2',
+      [parsedDate, babyId]
+    );
+
+    res.json({ 
+      message: 'Date of birth updated',
+      date_of_birth: birthDate
+    });
+  } catch (err) {
+    console.error('PUT /api/baby/:id/birth-date error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -403,22 +471,23 @@ app.post('/api/reminder', authenticateToken, async (req, res) => {
       oneDayBefore.setHours(14, 0, 0, 0);
 
      // insert into weekly_reminders
-     await pool.query(
+    await pool.query(
       `INSERT INTO weekly_reminders
-         (mother_id, baby_id, vaccine, vaccination_date, scheduled_at, sent)
-       VALUES ($1,$2,$3,$4,$5,false)`,
+          (mother_id, baby_id, vaccine, vaccination_date, scheduled_at, sent)
+        VALUES ($1,$2,$3,$4,$5,false)
+        ON CONFLICT ON CONSTRAINT unique_reminder DO NOTHING;`,
       [motherId, babyId, vaccine, vaccinationDate, oneWeekBefore]
     );
-
+    
+    
     // insert into daily_reminders
     await pool.query(
       `INSERT INTO daily_reminders
-         (mother_id, baby_id, vaccine, vaccination_date, scheduled_at, sent)
-       VALUES ($1,$2,$3,$4,$5,false)`,
+          (mother_id, baby_id, vaccine, vaccination_date, scheduled_at, sent)
+        VALUES ($1,$2,$3,$4,$5,false);`,
       [motherId, babyId, vaccine, vaccinationDate, oneDayBefore]
     );
   }
-
     res.status(201).json({ message: 'Reminders created successfully' });
   } catch (err) {
     console.error('Error creating reminders:', err);
@@ -450,44 +519,62 @@ async function sendCombinedReminderEmail(email, fullName, reminders) {
   });
 }
 
-// every day at 1400hrs, scan for unsent reminders
+// weekly job at 14:00 every day
+cron.schedule('* * * * *', async () => {
+  const now = new Date();
+  const res = await pool.query(
+    `SELECT r.id, r.vaccine, r.vaccination_date, m.full_name, u.email
+       FROM weekly_reminders r
+       JOIN mothers m ON m.id = r.mother_id
+       JOIN users u   ON u.id = m.user_id
+      WHERE r.sent = false AND r.scheduled_at <= $1
+    `, [now]
+  );
+
+  const reminders = res.rows;
+  if (reminders.length === 0) return;
+
+  // send one combined email for the entire batch
+  await sendCombinedReminderEmail(
+    reminders[0].email,
+    reminders[0].full_name,
+    reminders
+  );
+
+  // mark them all sent in a single UPDATE
+  const ids = reminders.map(r => r.id);
+  await pool.query(
+    `UPDATE weekly_reminders SET sent = true WHERE id = ANY($1)`,
+    [ids]
+  );
+});
+
+// daily job at 14:00 every day
 cron.schedule('0 14 * * *', async () => {
   const now = new Date();
-  try {
-    // pull weekly and daily reminders in one go
-    const result = await pool.query(`
-      SELECT r.id, r.vaccine, r.vaccination_date, r.scheduled_at,
-             m.full_name, u.email AS recipient_email
-      FROM weekly_reminders r
-      JOIN mothers m ON m.id = r.mother_id
-      JOIN users u ON u.id = m.user_id
+  const res = await pool.query(
+    `SELECT r.id, r.vaccine, r.vaccination_date, m.full_name, u.email
+       FROM daily_reminders r
+       JOIN mothers m ON m.id = r.mother_id
+       JOIN users u   ON u.id = m.user_id
       WHERE r.sent = false AND r.scheduled_at <= $1
-      UNION ALL
-      SELECT r.id, r.vaccine, r.vaccination_date, r.scheduled_at,
-             m.full_name, u.email AS recipient_email
-      FROM daily_reminders r
-      JOIN mothers m ON m.id = r.mother_id
-      JOIN users u ON u.id = m.user_id
-      WHERE r.sent = false AND r.scheduled_at <= $1
-    `, [now]);
-    
-    if (result.rows.length > 0) {
-      // Send single combined email
-      await sendCombinedReminderEmail(
-        result.rows[0].recipient_email, 
-        result.rows[0].full_name, 
-        result.rows
-      );
-    
-      // Update all records using your original approach
-      for (const row of result.rows) {
-        await pool.query(`UPDATE weekly_reminders SET sent = true WHERE id = $1`, [row.id]);
-        await pool.query(`UPDATE daily_reminders SET sent = true WHERE id = $1`, [row.id]);
-      }
-    }
-  } catch (err) {
-    console.error('cron reminder error:', err);
-  }
+    `, [now]
+  );
+
+  const reminders = res.rows;
+  if (reminders.length === 0) return;
+
+  await sendCombinedReminderEmail(
+    reminders[0].email,
+    reminders[0].full_name,
+    reminders
+  );
+
+  const ids = reminders.map(r => r.id);
+  await pool.query(
+    `UPDATE daily_reminders SET sent = true WHERE id = ANY($1)`,
+    [ids]
+  );
 });
 
 // Start the server

@@ -9,6 +9,13 @@ import { ResetPasswordForm } from "./components/ResetPasswordForm"
 import { ProfileForm } from "./components/ProfileForm"
 import type { Vaccination } from "./components/columns"
 
+interface ProfileResponse {
+  mustResetPassword: boolean
+  profileComplete: boolean
+  mother: { id: number; full_name: string; phone_number: string } | null
+  baby: { id: number; baby_name: string; date_of_birth: string; gender: string } | null
+}
+
 function App() {
   const [data, setData] = useState<Vaccination[]>([])
   const [loading, setLoading] = useState(true)
@@ -17,166 +24,148 @@ function App() {
   const [profileComplete, setProfileComplete] = useState(false)
   const [tempToken, setTempToken] = useState<string | null>(null)
   const [view, setView] = useState<"signup" | "login" | "reset" | "profile" | "dashboard">("signup")
+  const [profile, setProfile] = useState<ProfileResponse | null>(null)
 
+  // load token
   useEffect(() => {
-    const storedToken = localStorage.getItem("authToken")
-    if (storedToken) {
-      setAuthToken(storedToken)
-    }
+    const stored = localStorage.getItem("authToken")
+    if (stored) setAuthToken(stored)
   }, [])
-  
+
+  // fetch profile status and data
   useEffect(() => {
-    const fetchProfileStatus = async () => {
-      if (!authToken) return;
-  
+    const fetchProfile = async () => {
+      if (!authToken) return
       try {
         const res = await fetch("http://localhost:5000/api/profile", {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        });
-  
+          headers: { Authorization: `Bearer ${authToken}` },
+        })
         if (res.ok) {
-          const data = await res.json();
-          setMustReset(data.mustResetPassword);
-          setProfileComplete(data.profileComplete);
-  
-          // Update view accordingly
-          if (data.mustResetPassword) {
-            setView("reset");
-          } else if (!data.profileComplete) {
-            setView("profile");
-          } else {
-            setView("dashboard");
-          }
-        } else {
-          console.error("Failed to fetch profile status");
+          const json: ProfileResponse = await res.json()
+          setMustReset(json.mustResetPassword)
+          setProfileComplete(json.profileComplete)
+          setProfile(json)
+          // decide view
+          if (json.mustResetPassword) setView("reset")
+          else if (!json.profileComplete) setView("profile")
+          else setView("dashboard")
         }
-      } catch (err) {
-        console.error("Error fetching profile status:", err);
+      } catch (e) {
+        console.error(e)
       }
-    };
-  
-    fetchProfileStatus();
-  }, [authToken]);
-  
+    }
+    fetchProfile()
+  }, [authToken])
 
+  // fetch schedule
   useEffect(() => {
-    const fetchVaccinationSchedule = async () => {
-      if (!authToken || mustReset || !profileComplete) return;
-      
-      setLoading(true);
+    const fetchSchedule = async () => {
+      if (!authToken || mustReset || !profileComplete) return
+      setLoading(true)
       try {
         const res = await fetch("http://localhost:5000/api/vaccination-schedule", {
+          headers: { Authorization: `Bearer ${authToken}` },
+        })
+        if (res.ok) {
+          setData(await res.json())
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchSchedule()
+  }, [authToken, mustReset, profileComplete])
+
+   // once we enter the dashboard, fire /api/reminder
+   useEffect(() => {
+      if (view === "dashboard" && authToken) {
+        fetch("http://localhost:5000/api/reminder", {
+          method: "POST",
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${authToken}`,
           },
-        });
-  
-        if (res.ok) {
-          const result = await res.json();
-          setData(result);
-        } else {
-          console.error("Failed to fetch vaccination schedule");
-        }
-      } catch (error) {
-        console.error("Fetch error:", error);
-      } finally {
-        setLoading(false);
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("reminder scheduling failed");
+            return res.json();
+          })
+          .then((j) => console.log("reminder scheduled:", j))
+          .catch((err) => console.error("could not schedule reminders:", err));
       }
-    };
-  
-    fetchVaccinationSchedule();
-  }, [authToken, mustReset, profileComplete]);
-  
+       }, [view, authToken]);
+    
 
   function renderView() {
     switch (view) {
       case "signup":
         return (
           <SignupForm
-            onSignupSuccess={token => {
-              setTempToken(token)
-              setView("reset")
-            }}
+            onSignupSuccess={t => { setTempToken(t); setView("reset"); }}
             onSwitchToLogin={() => setView("login")}
           />
         )
-  
       case "reset":
         return (
           <ResetPasswordForm
             token={tempToken ?? ""}
-            onResetComplete={() => {
-              setTempToken(null)
-              setView("login")
-            }}
+            onResetComplete={() => { setTempToken(null); setView("login"); }}
           />
         )
-  
       case "login":
         return (
           <LoginForm
-            onLoginSuccess={async (token, mustReset) => {
+            onLoginSuccess={async (token, must) => {
               setAuthToken(token)
-              setMustReset(mustReset)
-  
-              if (mustReset) {
-                setView("reset")
-                return
-              }
-  
-              try {
-                const res = await fetch("/api/profile", {
-                  headers: { Authorization: `Bearer ${token}` },
-                })
-                const profile = await res.json()
-                if (profile.profileComplete) {
-                  setProfileComplete(true)
-                  setView("dashboard")
-                } else {
-                  setView("profile")
-                }
-              } catch (err) {
-                console.error("Error fetching profile:", err)
-                setView("profile")
-              }
+              setMustReset(must)
+              if (must) { setView("reset"); return }
+              // refresh profile
+              setAuthToken(token)
             }}
           />
         )
-  
       case "profile":
-        if (authToken) {
-          return (
-            <ProfileForm
-              token={authToken}
-              onProfileComplete={() => {
-                setProfileComplete(true)
-                setView("dashboard")
-              }}
+        return authToken ? (
+          <ProfileForm
+            token={authToken}
+            onProfileComplete={() => { setProfileComplete(true); setView("dashboard"); }}
+          />
+        ) : <p>Unauthorized</p>
+        case "dashboard": {
+          // take the ISO string from the server, convert to local, format as YYYY‑MM‑DD
+          const iso = profile?.baby?.date_of_birth
+          const initialBirthDate = iso
+            ? (() => {
+                const d = new Date(iso)
+                const y = d.getFullYear()
+                const m = String(d.getMonth() + 1).padStart(2, "0")
+                const day = String(d.getDate()).padStart(2, "0")
+                return `${y}-${m}-${day}`
+              })()
+            : ""
+          return loading ? <p>Loading...</p> : (
+            <DataTable
+              columns={columns}
+              data={data}
+              initialBirthDate={initialBirthDate}
+              babyId={profile!.baby!.id}
+              authToken={authToken!}
             />
           )
-        }
-        return <p>Unauthorized</p>
-  
-      case "dashboard":
-        return loading ? <p>Loading...</p> : <DataTable columns={columns} data={data} />
+        } 
       default:
-        return <p>Invalid view</p>
+        return null
     }
-  }  
+  }
+
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <div className="p-6">
         <ModeToggle />
         <h1 className="text-2xl font-bold mb-4 text-center">
-          {{
-            signup: "Welcome to Chanjo",
-            reset: "Reset Password",
-            login: "Log In",
-            profile: "Complete Your Profile",
-            dashboard: "Vaccination Schedule",
-          }[view]}
+          {{ signup: "Welcome to Chanjo", reset: "Reset Password", login: "Log In", profile: "Complete Your Profile", dashboard: "Vaccination Schedule" }[view]}
         </h1>
         {renderView()}
       </div>
