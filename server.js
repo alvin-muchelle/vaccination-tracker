@@ -437,63 +437,86 @@ function parseAgeToDays(ageStr) {
 
 app.post('/api/reminder', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     // 1) get mother
-    const m = await pool.query('SELECT id FROM mothers WHERE user_id = $1', [userId]);
-    if (!m.rows.length) return res.status(404).json({ error: 'Mother not found' });
+    const m = await client.query(
+      'SELECT id FROM mothers WHERE user_id = $1',
+      [userId]
+    );
+    if (m.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Mother not found' });
+    }
     const motherId = m.rows[0].id;
 
-    // 2) get baby
-    const b = await pool.query('SELECT id, date_of_birth FROM babies WHERE mother_id = $1', [motherId]);
-    if (!b.rows.length) return res.status(404).json({ error: 'Baby not found' });
-    const { id: babyId, date_of_birth } = b.rows[0];
-    const dob = new Date(date_of_birth);
+    // 2) get baby (re‑read DOB here so it’s always fresh)
+    const b = await client.query(
+      'SELECT id, date_of_birth FROM babies WHERE mother_id = $1',
+      [motherId]
+    );
+    if (b.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Baby not found' });
+    }
+    const babyId = b.rows[0].id;
+    const dob = new Date(b.rows[0].date_of_birth);
 
-    // 3) get schedule
-    const sched = await pool.query('SELECT age, vaccine FROM vaccination_schedule');
-
+    // 3) get vaccination schedule
+    const sched = await client.query('SELECT age, vaccine FROM vaccination_schedule');
     const now = new Date();
+
     for (let { age, vaccine } of sched.rows) {
       const daysOffset = parseAgeToDays(age);
       const vaccinationDate = new Date(dob);
       vaccinationDate.setDate(dob.getDate() + daysOffset);
-
       if (vaccinationDate <= now) continue;
 
-      // reminders
+      // compute send times
       const oneWeekBefore = new Date(vaccinationDate);
       oneWeekBefore.setDate(vaccinationDate.getDate() - 7);
-      oneWeekBefore.setHours(14, 0, 0, 0);
+      oneWeekBefore.setHours(14,0,0,0);
 
       const oneDayBefore = new Date(vaccinationDate);
       oneDayBefore.setDate(vaccinationDate.getDate() - 1);
-      oneDayBefore.setHours(14, 0, 0, 0);
+      oneDayBefore.setHours(14,0,0,0);
 
-     // insert into weekly_reminders
-    await pool.query(
-      `INSERT INTO weekly_reminders
-          (mother_id, baby_id, vaccine, vaccination_date, scheduled_at, sent)
-        VALUES ($1,$2,$3,$4,$5,false)
-        ON CONFLICT ON CONSTRAINT unique_reminder DO NOTHING;`,
-      [motherId, babyId, vaccine, vaccinationDate, oneWeekBefore]
-    );
-    
-    
-    // insert into daily_reminders
-    await pool.query(
-      `INSERT INTO daily_reminders
-          (mother_id, baby_id, vaccine, vaccination_date, scheduled_at, sent)
-        VALUES ($1,$2,$3,$4,$5,false);`,
-      [motherId, babyId, vaccine, vaccinationDate, oneDayBefore]
-    );
-  }
-    res.status(201).json({ message: 'Reminders created successfully' });
+      // upsert weekly_reminder
+      await client.query(
+        `INSERT INTO weekly_reminders
+           (mother_id,baby_id,vaccine,vaccination_date,scheduled_at,sent)
+         VALUES($1,$2,$3,$4,$5,false)
+         ON CONFLICT ON CONSTRAINT uq_weekly_reminders
+           DO UPDATE SET scheduled_at = EXCLUDED.scheduled_at`,
+        [motherId,babyId,vaccine,vaccinationDate,oneWeekBefore]
+      );
+
+      // upsert daily_reminder
+      await client.query(
+        `INSERT INTO daily_reminders
+           (mother_id,baby_id,vaccine,vaccination_date,scheduled_at,sent)
+         VALUES($1,$2,$3,$4,$5,false)
+         ON CONFLICT ON CONSTRAINT uq_daily_reminders
+           DO UPDATE SET scheduled_at = EXCLUDED.scheduled_at`,
+        [motherId,babyId,vaccine,vaccinationDate,oneDayBefore]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: 'Reminders created or updated successfully' });
   } catch (err) {
-    console.error('Error creating reminders:', err);
+    await client.query('ROLLBACK');
+    console.error('Error creating/updating reminders:', err);
     res.status(500).json({ error: 'Server error while creating reminders' });
+  } finally {
+    client.release();
   }
 });
+
+
+
 
 // helper to actually send a reminder email
 async function sendCombinedReminderEmail(email, fullName, reminders) {
