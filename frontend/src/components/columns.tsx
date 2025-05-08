@@ -3,6 +3,7 @@ import { FilterIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
 import { Checkbox } from "./ui/checkbox"
+import { formatDateWithOrdinal } from "./calculateSchedule"
 
 export type Vaccination = {
   age: string
@@ -143,10 +144,7 @@ export const columns: ColumnDef<Vaccination>[] = [
   {
     accessorKey: "date_to_be_administered",
     header: "Date to be Administered",
-    cell: ({ row }) => {
-      const date = row.getValue("date_to_be_administered") as string
-      return <span>{date}</span>
-    }
+    cell: ({ row }) => formatDateWithOrdinal(row.getValue("date_to_be_administered"))
   }
     
 ]

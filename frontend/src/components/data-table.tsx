@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { ColumnResizer } from "./ColumnResizer"
 import { calculateVaccinationSchedule } from "./calculateSchedule"
 
-
 import {
   ColumnDef,
   ColumnFiltersState,

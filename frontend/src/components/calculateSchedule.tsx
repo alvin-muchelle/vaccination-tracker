@@ -41,8 +41,28 @@ export function calculateVaccinationSchedule<T extends Vaccination>(
   
       return {
         ...item,
-        date_to_be_administered: date.toISOString().split("T")[0], // e.g., "2025-07-12"
+        date_to_be_administered: date.toISOString().split("T")[0],
       }
     })
+  }
+
+  export function formatDateWithOrdinal(dateString: string): string {
+    const date = new Date(dateString);
+  
+    const day = date.getDate();
+    const month = date.toLocaleString("en-GB", { month: "long" });
+    const year = date.getFullYear();
+  
+    const getOrdinal = (n: number) => {
+      if (n > 3 && n < 21) return `${n}th`;
+      switch (n % 10) {
+        case 1: return `${n}st`;
+        case 2: return `${n}nd`;
+        case 3: return `${n}rd`;
+        default: return `${n}th`;
+      }
+    };
+  
+    return `${getOrdinal(day)} ${month} ${year}`;
   }
   

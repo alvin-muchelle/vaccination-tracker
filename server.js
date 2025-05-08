@@ -1,37 +1,52 @@
-const express = require('express');
-const { Pool } = require('pg');
-const cors = require('cors');
-const bcrypt = require('bcrypt');
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
+import express from 'express';
+import { Pool } from 'pg';
+import cors from 'cors';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+import nodemailer from 'nodemailer';
+import cron from 'node-cron';
+
+dotenv.config();
 
 // set up email 
-const nodemailer = require('nodemailer');
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
-async function sendTestEmail(to, password) {
-  const testAccount = await nodemailer.createTestAccount();
-
-  const transporter = nodemailer.createTransport({
-    host: testAccount.smtp.host,
-    port: testAccount.smtp.port,
-    secure: testAccount.smtp.secure,
-    auth: {
-      user: testAccount.user,
-      pass: testAccount.pass,
-    },
-  });
-
-  const info = await transporter.sendMail({
-    from: '"Vaccination Tracker" <no-reply@vtracker.com>',
-    to,
+export async function sendTemporaryPassword(email, tempPassword) {
+  await transporter.sendMail({
+    from: `"Chanjo" <${process.env.EMAIL_USER}>`,
+    to: email,
     subject: 'Your Temporary Password',
-    text: `Welcome to the Vaccination Tracker.\n\nYour temporary password is: ${password}`,
+    html: `
+      <p>Hello,</p>
+      <p>Welcome to Chanjo! Here’s your temporary password:</p>
+      <p><strong>${tempPassword}</strong></p>
+      <p>Please log in and reset your password within 15 minutes.</p>
+      <p>Best,<br/>Chanjo</p>
+    `,
   });
-
-  console.log("Email sent! Preview it here:", nodemailer.getTestMessageUrl(info));
 }
 
+async function sendPasswordResetConfirmation(email) {
+  await transporter.sendMail({
+    from: `"Chanjo" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: 'Your password has been changed',
+    html: `
+      <p>Hello,</p>
+      <p>This is a confirmation that your password was successfully changed.</p>
+      <p>If you did not perform this action, please contact support immediately.</p>
+      <p>Regards,<br/>Chanjo</p>
+    `,
+  });
+}
 
 // Initialize express app
 const app = express();
@@ -84,7 +99,7 @@ app.post('/api/signup', async (req, res) => {
     );
 
     // Send the temporary password via email
-    await sendTestEmail(email, rawPassword);
+    await sendTemporaryPassword(email, rawPassword);
 
     // Generate a short-lived token for password reset
     const token = jwt.sign({ userId: newUser.rows[0].id, email }, process.env.JWT_SECRET, { expiresIn: '15m' });
@@ -123,11 +138,14 @@ app.post('/api/reset-password', async (req, res) => {
       [newHashedPassword, email]
     );
 
-    res.status(200).json({ message: 'Password updated successfully' });
+    // Send confirmation email
+    await sendPasswordResetConfirmation(email);
+
+    res.status(200).json({ message: 'Password updated and confirmation email sent' });
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(401).json({ error: 'Invalid or expired token' });
-  }
+  }    
 });
 
 // Login Route
@@ -310,6 +328,165 @@ app.get('/api/vaccination-schedule/:age', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error fetching schedule for given age' });
+  }
+});
+
+// Helper: parse an age string into days
+function parseAgeToDays(ageStr) {
+  ageStr = ageStr.trim().toLowerCase();
+  if (ageStr === 'birth') return 0;
+
+  // map units to days
+  const unitMap = {
+    week: 7,
+    weeks: 7,
+    month: 30,
+    months: 30,
+    year: 365,
+    years: 365,
+  };
+
+  // range like "15–18 months"
+  const rangeRegex = /^(\d+)[–-](\d+)\s*(\w+)$/;
+  const singleRegex = /^(\d+)\s*(\w+)$/;
+
+  let match = ageStr.match(rangeRegex);
+  if (match) {
+    const [, start, end, unit] = match;
+    const avg = (parseInt(start, 10) + parseInt(end, 10)) / 2;
+    return avg * (unitMap[unit] || 0);
+  }
+
+  match = ageStr.match(singleRegex);
+  if (match) {
+    const [, num, unit] = match;
+    return parseInt(num, 10) * (unitMap[unit] || 0);
+  }
+
+  // fallback: 0 days
+  return 0;
+}
+
+app.post('/api/reminder', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+
+  try {
+    // 1) get mother
+    const m = await pool.query('SELECT id FROM mothers WHERE user_id = $1', [userId]);
+    if (!m.rows.length) return res.status(404).json({ error: 'Mother not found' });
+    const motherId = m.rows[0].id;
+
+    // 2) get baby
+    const b = await pool.query('SELECT id, date_of_birth FROM babies WHERE mother_id = $1', [motherId]);
+    if (!b.rows.length) return res.status(404).json({ error: 'Baby not found' });
+    const { id: babyId, date_of_birth } = b.rows[0];
+    const dob = new Date(date_of_birth);
+
+    // 3) get schedule
+    const sched = await pool.query('SELECT age, vaccine FROM vaccination_schedule');
+
+    const now = new Date();
+    for (let { age, vaccine } of sched.rows) {
+      const daysOffset = parseAgeToDays(age);
+      const vaccinationDate = new Date(dob);
+      vaccinationDate.setDate(dob.getDate() + daysOffset);
+
+      if (vaccinationDate <= now) continue;
+
+      // reminders
+      const oneWeekBefore = new Date(vaccinationDate);
+      oneWeekBefore.setDate(vaccinationDate.getDate() - 7);
+      oneWeekBefore.setHours(14, 0, 0, 0);
+
+      const oneDayBefore = new Date(vaccinationDate);
+      oneDayBefore.setDate(vaccinationDate.getDate() - 1);
+      oneDayBefore.setHours(14, 0, 0, 0);
+
+     // insert into weekly_reminders
+     await pool.query(
+      `INSERT INTO weekly_reminders
+         (mother_id, baby_id, vaccine, vaccination_date, scheduled_at, sent)
+       VALUES ($1,$2,$3,$4,$5,false)`,
+      [motherId, babyId, vaccine, vaccinationDate, oneWeekBefore]
+    );
+
+    // insert into daily_reminders
+    await pool.query(
+      `INSERT INTO daily_reminders
+         (mother_id, baby_id, vaccine, vaccination_date, scheduled_at, sent)
+       VALUES ($1,$2,$3,$4,$5,false)`,
+      [motherId, babyId, vaccine, vaccinationDate, oneDayBefore]
+    );
+  }
+
+    res.status(201).json({ message: 'Reminders created successfully' });
+  } catch (err) {
+    console.error('Error creating reminders:', err);
+    res.status(500).json({ error: 'Server error while creating reminders' });
+  }
+});
+
+// helper to actually send a reminder email
+async function sendCombinedReminderEmail(email, fullName, reminders) {
+  const vaccinationDate = reminders[0].vaccination_date;
+  const formattedDate = vaccinationDate.toDateString();
+
+  const reminderList = reminders.map(reminder => `
+    <li><strong>${reminder.vaccine}</strong></li>
+  `).join('');
+
+  await transporter.sendMail({
+    from: `"Chanjo" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: 'Vaccinations Required Next Week',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px;">
+        <p>Dear ${fullName},</p>
+        <p>Here are your baby's vaccinations due next week on ${formattedDate}:</p>
+        <ul>${reminderList}</ul>
+        <p>Regards,<br/>Chanjo Team</p>
+      </div>
+    `
+  });
+}
+
+// every day at 1400hrs, scan for unsent reminders
+cron.schedule('0 14 * * *', async () => {
+  const now = new Date();
+  try {
+    // pull weekly and daily reminders in one go
+    const result = await pool.query(`
+      SELECT r.id, r.vaccine, r.vaccination_date, r.scheduled_at,
+             m.full_name, u.email AS recipient_email
+      FROM weekly_reminders r
+      JOIN mothers m ON m.id = r.mother_id
+      JOIN users u ON u.id = m.user_id
+      WHERE r.sent = false AND r.scheduled_at <= $1
+      UNION ALL
+      SELECT r.id, r.vaccine, r.vaccination_date, r.scheduled_at,
+             m.full_name, u.email AS recipient_email
+      FROM daily_reminders r
+      JOIN mothers m ON m.id = r.mother_id
+      JOIN users u ON u.id = m.user_id
+      WHERE r.sent = false AND r.scheduled_at <= $1
+    `, [now]);
+    
+    if (result.rows.length > 0) {
+      // Send single combined email
+      await sendCombinedReminderEmail(
+        result.rows[0].recipient_email, 
+        result.rows[0].full_name, 
+        result.rows
+      );
+    
+      // Update all records using your original approach
+      for (const row of result.rows) {
+        await pool.query(`UPDATE weekly_reminders SET sent = true WHERE id = $1`, [row.id]);
+        await pool.query(`UPDATE daily_reminders SET sent = true WHERE id = $1`, [row.id]);
+      }
+    }
+  } catch (err) {
+    console.error('cron reminder error:', err);
   }
 });
 

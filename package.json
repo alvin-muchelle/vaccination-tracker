@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "description": "",
+  "type": "module",
   "dependencies": {
     "bcrypt": "^5.1.1",
     "class-variance-authority": "^0.7.1",
@@ -19,6 +20,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.507.0",
+    "node-cron": "^3.0.3",
     "nodemailer": "^7.0.0",
     "pg": "^8.15.6",
     "react": "^19.1.0",

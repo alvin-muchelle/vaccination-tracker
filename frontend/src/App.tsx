@@ -7,7 +7,6 @@ import { SignupForm } from "./components/SignUpForm"
 import { LoginForm } from "./components/LoginForm"
 import { ResetPasswordForm } from "./components/ResetPasswordForm"
 import { ProfileForm } from "./components/ProfileForm"
-// import { ColumnDef } from "@tanstack/react-table"
 import type { Vaccination } from "./components/columns"
 
 function App() {
