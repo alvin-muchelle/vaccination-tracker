@@ -200,23 +200,23 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Create/Update Profile Route - UPDATED
+// Create/Update Profile Route
 app.post('/api/profile', authenticateToken, async (req, res) => {
   const { fullName, phoneNumber, babyName, dateOfBirth, gender } = req.body;
   const userId = req.user.userId;
 
   const genderNormalized = gender.toLowerCase();
-
   const allowedGenders = ['male', 'female'];
+
   if (!allowedGenders.includes(genderNormalized)) {
     return res.status(400).json({ error: 'Invalid gender. Must be "Male" or "Female".' });
   }
 
   try {
-    // Validate and parse date
     if (!dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
+
     const parsedDate = new Date(dateOfBirth + 'T00:00:00Z');
     if (isNaN(parsedDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date' });
@@ -227,7 +227,6 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
 
     let motherId;
     if (motherResult.rows.length === 0) {
-      // Insert new mother
       const insertMother = await pool.query(
         `INSERT INTO mothers (user_id, full_name, phone_number)
          VALUES ($1, $2, $3) RETURNING id`,
@@ -235,7 +234,6 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
       );
       motherId = insertMother.rows[0].id;
     } else {
-      // Update existing mother
       motherId = motherResult.rows[0].id;
       await pool.query(
         `UPDATE mothers SET full_name = $1, phone_number = $2
@@ -244,24 +242,22 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
       );
     }
 
-    // Check if a baby already exists for this mother
-    const babyResult = await pool.query('SELECT id FROM babies WHERE mother_id = $1', [motherId]);
+    // Check if Baby exists
+    const existingBaby = await pool.query(
+      `SELECT id FROM babies WHERE mother_id = $1 AND baby_name = $2`,
+      [motherId, babyName]
+    );
 
-    if (babyResult.rows.length === 0) {
-      // Insert baby
-      await pool.query(
-        `INSERT INTO babies (mother_id, baby_name, date_of_birth, gender)
-         VALUES ($1, $2, $3, $4)`,
-        [motherId, babyName, parsedDate, genderNormalized]
-      );
-    } else {
-      // Update existing baby
-      await pool.query(
-        `UPDATE babies SET baby_name = $1, date_of_birth = $2, gender = $3
-         WHERE mother_id = $4`,
-        [babyName, parsedDate, genderNormalized, motherId]
-      );
+    if (existingBaby.rows.length > 0) {
+      return res.status(400).json({ error: 'Baby name already exists for this mother' });
     }
+
+    // Always insert a new baby
+    await pool.query(
+      `INSERT INTO babies (mother_id, baby_name, date_of_birth, gender)
+       VALUES ($1, $2, $3, $4)`,
+      [motherId, babyName, parsedDate, genderNormalized]
+    );
 
     res.status(200).json({ message: 'Profile saved successfully' });
 
@@ -271,61 +267,64 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Get Profile Route - UPDATED
+
+// Get Profile Route
 app.get('/api/profile', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-
   try {
-    // Get user data
-    const userResult = await pool.query('SELECT must_reset_password FROM users WHERE id = $1', [userId]);
-    const user = userResult.rows[0];
+    // Fetch user
+    const userRes = await pool.query(
+      'SELECT must_reset_password FROM users WHERE id = $1',
+      [userId]
+    );
+    const mustResetPassword = userRes.rows[0].must_reset_password;
 
-    // Get mother's profile
-    const motherResult = await pool.query(
+    // Fetch mother
+    const motherRes = await pool.query(
       'SELECT id, full_name, phone_number FROM mothers WHERE user_id = $1',
       [userId]
     );
-
-    if (motherResult.rows.length === 0) {
-      return res.status(200).json({
-        mustResetPassword: user.must_reset_password,
-        profileComplete: false,
-        mother: null,
-      });
+    if (!motherRes.rows.length) {
+      return res.json({ mustResetPassword, profileComplete: false, mother: null, babies: [] });
     }
+    const mother = motherRes.rows[0];
 
-    const mother = motherResult.rows[0];
-
-    // Get baby profile
-    const babyResult = await pool.query(
+    // Fetch all babies for this mother
+    const babiesRes = await pool.query(
       'SELECT id, baby_name, date_of_birth, gender FROM babies WHERE mother_id = $1',
       [mother.id]
     );
 
-    const baby = babyResult.rows[0] || null;
+    // Format dates and shape
+    const babies = babiesRes.rows.map(b => ({
+      id: b.id,
+      baby_name: b.baby_name,
+      gender: b.gender,
+      date_of_birth: b.date_of_birth
+      ? (() => {
+        const d = b.date_of_birth;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+      })()
+      : null
+    }));
 
-    // Format response with date as YYYY-MM-DD string
-    const response = {
-      mustResetPassword: user.must_reset_password,
-      profileComplete: !!(mother.full_name && mother.phone_number && baby?.baby_name && baby?.date_of_birth && baby?.gender),
-      mother: {
-        ...mother,
-        full_name: mother.full_name // Keep consistent naming
-      },
-      baby: baby ? {
-        ...baby,
-        date_of_birth: baby.date_of_birth ? baby.date_of_birth.toISOString().split('T')[0] : null
-      } : null
-    };
+    const profileComplete = !!(
+      mother.full_name &&
+      mother.phone_number &&
+      babies.length > 0
+    );
 
-    res.status(200).json(response);
+    res.json({ mustResetPassword, profileComplete, mother, babies });
   } catch (err) {
     console.error('GET /api/profile error:', err);
     res.status(500).json({ error: 'Error fetching profile' });
   }
 });
 
-// Update Baby's Date of Birth - UPDATED
+// Update Baby's Date of Birth
 app.put('/api/baby/:id/birth-date', authenticateToken, async (req, res) => {
   const motherUserId = req.user.userId;
   const babyId = parseInt(req.params.id, 10);
@@ -435,87 +434,70 @@ function parseAgeToDays(ageStr) {
   return 0;
 }
 
-app.post('/api/reminder', authenticateToken, async (req, res) => {
-  const userId = req.user.userId;
-  const client = await pool.connect();
+app.post('/api/reminder/:babyId', authenticateToken, async (req, res) => {
+  const userId   = req.user.userId;
+  const babyId   = parseInt(req.params.babyId, 10);
+
   try {
-    await client.query('BEGIN');
-
-    // 1) get mother
-    const m = await client.query(
-      'SELECT id FROM mothers WHERE user_id = $1',
-      [userId]
+    // verify baby belongs to this user
+    const vb = await pool.query(
+      `SELECT b.date_of_birth
+         FROM babies b
+         JOIN mothers m ON m.id = b.mother_id
+        WHERE b.id = $1 AND m.user_id = $2`,
+      [babyId, userId]
     );
-    if (m.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Mother not found' });
-    }
-    const motherId = m.rows[0].id;
+    if (!vb.rows.length) return res.status(404).json({ error: 'Baby not found' });
 
-    // 2) get baby (re‑read DOB here so it’s always fresh)
-    const b = await client.query(
-      'SELECT id, date_of_birth FROM babies WHERE mother_id = $1',
-      [motherId]
-    );
-    if (b.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Baby not found' });
-    }
-    const babyId = b.rows[0].id;
-    const dob = new Date(b.rows[0].date_of_birth);
+    const dob = new Date(vb.rows[0].date_of_birth);
 
-    // 3) get vaccination schedule
-    const sched = await client.query('SELECT age, vaccine FROM vaccination_schedule');
-    const now = new Date();
+    // remove any existing reminders for this baby
+    await pool.query('DELETE FROM weekly_reminders WHERE mother_id = (SELECT id FROM mothers WHERE user_id=$1) AND baby_id=$2', [userId, babyId]);
+
+    await pool.query('DELETE FROM daily_reminders WHERE mother_id = (SELECT id FROM mothers WHERE user_id=$1) AND baby_id=$2', [userId, babyId]);
+
+    // re‑compute and insert
+    const sched = await pool.query('SELECT age, vaccine FROM vaccination_schedule');
+    const now   = new Date();
 
     for (let { age, vaccine } of sched.rows) {
-      const daysOffset = parseAgeToDays(age);
-      const vaccinationDate = new Date(dob);
+      const daysOffset     = parseAgeToDays(age);
+      const vaccinationDate= new Date(dob);
       vaccinationDate.setDate(dob.getDate() + daysOffset);
       if (vaccinationDate <= now) continue;
 
-      // compute send times
-      const oneWeekBefore = new Date(vaccinationDate);
+      const oneWeekBefore  = new Date(vaccinationDate);
       oneWeekBefore.setDate(vaccinationDate.getDate() - 7);
       oneWeekBefore.setHours(14,0,0,0);
 
-      const oneDayBefore = new Date(vaccinationDate);
+      const oneDayBefore   = new Date(vaccinationDate);
       oneDayBefore.setDate(vaccinationDate.getDate() - 1);
       oneDayBefore.setHours(14,0,0,0);
 
-      // upsert weekly_reminder
-      await client.query(
-        `INSERT INTO weekly_reminders
-           (mother_id,baby_id,vaccine,vaccination_date,scheduled_at,sent)
-         VALUES($1,$2,$3,$4,$5,false)
-         ON CONFLICT ON CONSTRAINT uq_weekly_reminders
-           DO UPDATE SET scheduled_at = EXCLUDED.scheduled_at`,
-        [motherId,babyId,vaccine,vaccinationDate,oneWeekBefore]
+      await pool.query(
+        `INSERT INTO weekly_reminders(mother_id,baby_id,vaccine,vaccination_date,scheduled_at,sent)
+               VALUES(
+                 (SELECT id FROM mothers WHERE user_id=$1),
+                 $2,$3,$4,$5,false
+               )`,
+        [userId,babyId,vaccine,vaccinationDate,oneWeekBefore]
       );
-
-      // upsert daily_reminder
-      await client.query(
-        `INSERT INTO daily_reminders
-           (mother_id,baby_id,vaccine,vaccination_date,scheduled_at,sent)
-         VALUES($1,$2,$3,$4,$5,false)
-         ON CONFLICT ON CONSTRAINT uq_daily_reminders
-           DO UPDATE SET scheduled_at = EXCLUDED.scheduled_at`,
-        [motherId,babyId,vaccine,vaccinationDate,oneDayBefore]
+      await pool.query(
+        `INSERT INTO daily_reminders(mother_id,baby_id,vaccine,vaccination_date,scheduled_at,sent)
+               VALUES(
+                 (SELECT id FROM mothers WHERE user_id=$1),
+                 $2,$3,$4,$5,false
+               )`,
+        [userId,babyId,vaccine,vaccinationDate,oneDayBefore]
       );
     }
 
-    await client.query('COMMIT');
-    res.json({ message: 'Reminders created or updated successfully' });
+    res.status(201).json({ message: 'Reminders regenerated successfully' });
   } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('Error creating/updating reminders:', err);
+    console.error(err);
     res.status(500).json({ error: 'Server error while creating reminders' });
-  } finally {
-    client.release();
   }
 });
-
-
 
 
 // helper to actually send a reminder email
@@ -534,7 +516,7 @@ async function sendCombinedReminderEmail(email, fullName, reminders) {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px;">
         <p>Dear ${fullName},</p>
-        <p>Here are your baby's vaccinations due next week on ${formattedDate}:</p>
+        <p>Here are your baby's vaccinations due on ${formattedDate}:</p>
         <ul>${reminderList}</ul>
         <p>Regards,<br/>Chanjo Team</p>
       </div>
@@ -542,8 +524,8 @@ async function sendCombinedReminderEmail(email, fullName, reminders) {
   });
 }
 
-// weekly job at 14:00 every day
-cron.schedule('* * * * *', async () => {
+// weekly job at 1400hrs every day
+cron.schedule('0 14 * * *', async () => {
   const now = new Date();
   const res = await pool.query(
     `SELECT r.id, r.vaccine, r.vaccination_date, m.full_name, u.email

@@ -7,13 +7,21 @@ import { SignupForm } from "./components/SignUpForm"
 import { LoginForm } from "./components/LoginForm"
 import { ResetPasswordForm } from "./components/ResetPasswordForm"
 import { ProfileForm } from "./components/ProfileForm"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import type { Vaccination } from "./components/columns"
+
+interface Baby {
+  id: number
+  baby_name: string
+  date_of_birth: string
+  gender: string
+}
 
 interface ProfileResponse {
   mustResetPassword: boolean
   profileComplete: boolean
   mother: { id: number; full_name: string; phone_number: string } | null
-  baby: { id: number; baby_name: string; date_of_birth: string; gender: string } | null
+  babies: Baby[]
 }
 
 function App() {
@@ -25,6 +33,7 @@ function App() {
   const [tempToken, setTempToken] = useState<string | null>(null)
   const [view, setView] = useState<"signup" | "login" | "reset" | "profile" | "dashboard">("signup")
   const [profile, setProfile] = useState<ProfileResponse | null>(null)
+  const [selectedBabyId, setSelectedBabyId] = useState<number | null>(null)
 
   // load token
   useEffect(() => {
@@ -45,6 +54,8 @@ function App() {
           setMustReset(json.mustResetPassword)
           setProfileComplete(json.profileComplete)
           setProfile(json)
+          // default-select first baby
+          if (json.babies.length) setSelectedBabyId(json.babies[0].id)
           // decide view
           if (json.mustResetPassword) setView("reset")
           else if (!json.profileComplete) setView("profile")
@@ -78,32 +89,31 @@ function App() {
     fetchSchedule()
   }, [authToken, mustReset, profileComplete])
 
-   // once we enter the dashboard, fire /api/reminder
-   useEffect(() => {
-      if (view === "dashboard" && authToken) {
-        fetch("http://localhost:5000/api/reminder", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
+  // schedule reminders when entering dashboard
+  useEffect(() => {
+    if (view === "dashboard" && authToken && selectedBabyId !== undefined) {
+      fetch(`http://localhost:5000/api/reminder/${selectedBabyId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+      })
+        .then(res => {
+          if (!res.ok) throw new Error("reminder scheduling failed")
+          return res.json()
         })
-          .then((res) => {
-            if (!res.ok) throw new Error("reminder scheduling failed");
-            return res.json();
-          })
-          .then((j) => console.log("reminder scheduled:", j))
-          .catch((err) => console.error("could not schedule reminders:", err));
-      }
-       }, [view, authToken]);
-    
+        .then(j => console.log("reminder scheduled:", j))
+        .catch(err => console.error("could not schedule reminders:", err))
+    }
+  }, [view, authToken, selectedBabyId])
 
   function renderView() {
     switch (view) {
       case "signup":
         return (
           <SignupForm
-            onSignupSuccess={t => { setTempToken(t); setView("reset"); }}
+            onSignupSuccess={t => { setTempToken(t); setView("reset") }}
             onSwitchToLogin={() => setView("login")}
           />
         )
@@ -111,17 +121,16 @@ function App() {
         return (
           <ResetPasswordForm
             token={tempToken ?? ""}
-            onResetComplete={() => { setTempToken(null); setView("login"); }}
+            onResetComplete={() => { setTempToken(null); setView("login") }}
           />
         )
       case "login":
         return (
           <LoginForm
-            onLoginSuccess={async (token, must) => {
+            onLoginSuccess={(token, must) => {
               setAuthToken(token)
               setMustReset(must)
               if (must) { setView("reset"); return }
-              // refresh profile
               setAuthToken(token)
             }}
           />
@@ -130,31 +139,42 @@ function App() {
         return authToken ? (
           <ProfileForm
             token={authToken}
-            onProfileComplete={() => { setProfileComplete(true); setView("dashboard"); }}
+            onProfileComplete={() => { setProfileComplete(true); setView("dashboard") }}
           />
         ) : <p>Unauthorized</p>
-        case "dashboard": {
-          // take the ISO string from the server, convert to local, format as YYYY‑MM‑DD
-          const iso = profile?.baby?.date_of_birth
-          const initialBirthDate = iso
-            ? (() => {
-                const d = new Date(iso)
-                const y = d.getFullYear()
-                const m = String(d.getMonth() + 1).padStart(2, "0")
-                const day = String(d.getDate()).padStart(2, "0")
-                return `${y}-${m}-${day}`
-              })()
-            : ""
-          return loading ? <p>Loading...</p> : (
-            <DataTable
-              columns={columns}
-              data={data}
-              initialBirthDate={initialBirthDate}
-              babyId={profile!.baby!.id}
-              authToken={authToken!}
-            />
-          )
-        } 
+      case "dashboard":
+        if (!profile) return <p>Loading profile…</p>
+        return loading ? <p>Loading schedule…</p> : (
+          <div className="space-y-4">
+            <Select
+              onValueChange={val => setSelectedBabyId(Number(val))}
+              defaultValue={selectedBabyId !== null ? String(selectedBabyId) : undefined}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Choose baby" />
+              </SelectTrigger>
+              <SelectContent>
+                {profile.babies.map(b => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.baby_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {selectedBabyId !== null && (
+              <DataTable
+                columns={columns}
+                data={data}
+                initialBirthDate={
+                  profile.babies.find(b => b.id === selectedBabyId)!.date_of_birth
+                }
+                babyId={selectedBabyId}
+                authToken={authToken!}
+              />
+            )}
+          </div>
+        )
       default:
         return null
     }
@@ -165,7 +185,13 @@ function App() {
       <div className="p-6">
         <ModeToggle />
         <h1 className="text-2xl font-bold mb-4 text-center">
-          {{ signup: "Welcome to Chanjo", reset: "Reset Password", login: "Log In", profile: "Complete Your Profile", dashboard: "Vaccination Schedule" }[view]}
+          {{
+            signup: "Welcome to Chanjo",
+            reset: "Reset Password",
+            login: "Log In",
+            profile: "Complete Your Profile",
+            dashboard: "Vaccination Schedule"
+          }[view]}
         </h1>
         {renderView()}
       </div>
