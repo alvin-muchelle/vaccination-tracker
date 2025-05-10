@@ -609,8 +609,6 @@ cron.schedule('0 14 * * *', async () => {
 });
 
 // Start the server
-
 app.listen(port, '::', () => {
     console.log(`Server running on [::]${port}`);
-    console.log('Using DATABASE_URL:', !!process.env.DATABASE_URL);
 });
