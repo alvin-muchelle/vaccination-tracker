@@ -67,10 +67,12 @@ app.use(express.json());
 
 // PostgreSQL connection setup
 const pool = new Pool({
-  connectionString: process.env.DATABASE_PUBLIC_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  ssl: { rejectUnauthorized: false }
 });
 
 // Test DB connection
@@ -607,7 +609,8 @@ cron.schedule('0 14 * * *', async () => {
 });
 
 // Start the server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-  console.log('Using DATABASE_URL:', !!process.env.DATABASE_URL);
+
+app.listen(port, '::', () => {
+    console.log(`Server running on [::]${port}`);
+    console.log('Using DATABASE_URL:', !!process.env.DATABASE_URL);
 });
