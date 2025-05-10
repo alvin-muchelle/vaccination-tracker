@@ -9,11 +9,11 @@
 [phases.build]
   cmds = [
     # build your frontend into static assets
-    "cd frontend && npm run build"
+    "cd frontend && npm run dev"
   ]
 
 [phases.start]
   cmds = [
     # start your backend (which can serve the static files)
-    "cd backend && npm run start"
+    "cd backend && npx nodemon server.js"
   ]
