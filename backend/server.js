@@ -66,10 +66,12 @@ app.use(cors());
 app.use(express.json());
 
 // PostgreSQL connection setup
-console.log("DATABASE_URL:", process.env.DATABASE_URL);
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+const { PGUSER, PGPASSWORD, PGHOST, PGPORT, POSTGRES_DB } = process.env;
+const connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${POSTGRES_DB}`;
 
+const pool = new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false } // if needed
 });
 
 // Test DB connection
