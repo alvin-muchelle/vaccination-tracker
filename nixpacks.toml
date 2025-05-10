@@ -1,0 +1,19 @@
+[phases.install]
+  cmds = [
+    # install backend first
+    "cd backend && npm install",
+    # then install frontend deps
+    "cd frontend && npm install",
+  ]
+
+[phases.build]
+  cmds = [
+    # build your frontend into static assets
+    "cd frontend && npm run build"
+  ]
+
+[phases.start]
+  cmds = [
+    # start your backend (which can serve the static files)
+    "cd backend && npm run start"
+  ]
