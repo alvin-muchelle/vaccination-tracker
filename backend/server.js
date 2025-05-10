@@ -64,11 +64,20 @@ const pool = new Pool({
   }
 });
 
-
 // Test DB connection
 pool.connect()
   .then(() => console.log('Database connected successfully'))
   .catch(err => console.log('Error connecting to DB:', err));
+
+// health check
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+// respond on root
+app.get("/", (_req, res) => {
+  res.status(200).send("Chanjo backend is running");
+});
 
 // Signup Route
 app.post('/api/signup', async (req, res) => {
