@@ -10,6 +10,15 @@ import cron from 'node-cron';
 
 dotenv.config();
 
+// global error handler
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // set up email 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -70,9 +79,9 @@ pool.connect()
   .catch(err => console.log('Error connecting to DB:', err));
 
 // health check
-app.get("/health", (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
+// app.get("/health", (_req, res) => {
+//   res.status(200).json({ status: "ok" });
+// });
 
 // respond on root
 app.get("/", (_req, res) => {
@@ -600,4 +609,9 @@ cron.schedule('0 14 * * *', async () => {
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+});
+console.log('Environment:', {
+    DB_HOST: process.env.DB_HOST,
+    DB_PORT: process.env.DB_PORT,
+    NODE_ENV: process.env.NODE_ENV,
 });
