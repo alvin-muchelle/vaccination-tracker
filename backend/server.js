@@ -79,6 +79,12 @@ app.get("/", (_req, res) => {
   res.status(200).send("Chanjo backend is running");
 });
 
+// Enable graceful shutdown logs
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, shutting down gracefully');
+  process.exit(0);
+});
+
 // Signup Route
 app.post('/api/signup', async (req, res) => {
   const { email } = req.body;
