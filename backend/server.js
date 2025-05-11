@@ -81,14 +81,14 @@ pool.connect()
   .catch(err => console.log('Error connecting to DB:', err));
 
 // health check
-// app.get("/health", (_req, res) => {
-//   res.status(200).json({ status: "ok" });
-// });
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
-// // respond on root
-// app.get("/", (_req, res) => {
-//   res.status(200).send("Chanjo chonjo backend is running");
-// });
+// respond on root
+app.get("/", (_req, res) => {
+  res.status(200).send("Chanjo chonjo backend is running");
+});
 
 // Enable graceful shutdown logs
 process.on('SIGTERM', () => {
