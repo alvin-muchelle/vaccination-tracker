@@ -85,10 +85,10 @@ pool.connect()
 //   res.status(200).json({ status: "ok" });
 // });
 
-// respond on root
-app.get("/", (_req, res) => {
-  res.status(200).send("Chanjo backend is running");
-});
+// // respond on root
+// app.get("/", (_req, res) => {
+//   res.status(200).send("Chanjo chonjo backend is running");
+// });
 
 // Enable graceful shutdown logs
 process.on('SIGTERM', () => {
