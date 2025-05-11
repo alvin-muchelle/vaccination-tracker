@@ -69,7 +69,7 @@ app.use(express.json());
 const { PGUSER, PGPASSWORD, PGHOST, PGPORT, POSTGRES_DB } = process.env;
 const connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${POSTGRES_DB}`;
 
-console.log("DATABASE_URL: ", process.env.PGUSER, process.env.PGPASSWORD, process.env.PGHOST, process.env.PGPORT, process.env.POSTGRES_DB);
+console.log(connectionString);
 const pool = new Pool({
   connectionString,
   ssl: { rejectUnauthorized: false }
