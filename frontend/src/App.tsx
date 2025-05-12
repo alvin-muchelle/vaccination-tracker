@@ -200,6 +200,13 @@ function App() {
     }
   };
 
+   const getSelectedBaby = () => {
+    if (!profile?.babies || profile.babies.length === 0) return null;
+    return selectedBabyId 
+      ? profile.babies.find(b => b.id === selectedBabyId) 
+      : profile.babies[0];
+  };
+
   function renderView() {
     switch (view) {
       case "signup":
@@ -269,11 +276,15 @@ function App() {
         return (
           <div className="space-y-4">
             <div className="flex flex-col items-center gap-4">
-              <h1 className="text-2xl font-bold mb-4 text-center">
-                {selectedBaby.baby_name}'s Vaccination Schedule
-              </h1>
-              
-              <div className="flex w-full justify-between items-center">
+              <div className="flex items-center gap-8"> 
+                <Button 
+                  onClick={() => setShowAddBabyForm(!showAddBabyForm)}
+                  variant="outline"
+                  className="whitespace-nowrap" /* Prevent text wrapping */
+                >
+                  {showAddBabyForm ? "Cancel" : "Add Another Baby"}
+                </Button>
+
                 {profile.babies.length > 1 && (
                   <Select
                     onValueChange={val => setSelectedBabyId(Number(val))}
@@ -281,7 +292,7 @@ function App() {
                   >
                     <SelectTrigger className="w-[200px]">
                       <div className="w-full text-left font-normal text-muted-foreground">
-                        Choose baby
+                        Select a baby
                       </div>
                     </SelectTrigger>
                     <SelectContent>
@@ -326,7 +337,7 @@ function App() {
           view === "login" ? "Log In" :
           view === "reset" ? "Reset Password" :
           view === "profile" ? "Complete Your Profile" :
-          ""}
+          `${getSelectedBaby()?.baby_name || 'Vaccination Schedule'}'s Vaccination Schedule`}
         </h1>
         {renderView()}
       </div>

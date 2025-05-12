@@ -122,24 +122,27 @@ export function DataTable({
 
   return (
     <div>
-      <div className="flex items-center py-4">
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="max-w-xs w-[220px] justify-start text-left font-normal text-muted-foreground">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              Pick new birth date
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-2 space-y-2" align="start">
-            <Calendar
-              mode="single"
-              selected={birthDate ? new Date(birthDate) : undefined}
-              onSelect={handleDateSelect}
-            />
-          </PopoverContent>
-        </Popover>
+      <div className="flex items-center justify-between py-4 gap-4">
+        <div className="flex items-center gap-4">
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="max-w-xs w-[220px] justify-start text-left font-normal text-muted-foreground">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                Pick a new birth date
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2 space-y-2" align="start">
+              <Calendar
+                mode="single"
+                selected={birthDate ? new Date(birthDate) : undefined}
+                onSelect={handleDateSelect}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+        
         <Input
-          placeholder="Search for vaccine"
+          placeholder="Search for a vaccine"
           value={(table.getColumn("vaccine")?.getFilterValue() as string) ?? ""}
           onChange={e => table.getColumn("vaccine")?.setFilterValue(e.target.value)}
           className="max-w-sm"
