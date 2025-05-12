@@ -1,4 +1,6 @@
 backup.sql
+folder-structure.txt
+troubleshoot.txt
 frontend/node_modules/
 frontend/.env
 backend/node_modules/

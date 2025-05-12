@@ -300,6 +300,82 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Add baby 
+app.post('/api/baby', authenticateToken, async (req, res) => {
+  const { babyName, dateOfBirth, gender } = req.body;
+  const userId = req.user.userId;
+
+  // Validate required fields
+  if (!babyName || !dateOfBirth || !gender) {
+    return res.status(400).json({ error: 'All fields (babyName, dateOfBirth, gender) are required' });
+  }
+
+  // Validate gender
+  const genderNormalized = gender.toLowerCase();
+  const allowedGenders = ['male', 'female'];
+  if (!allowedGenders.includes(genderNormalized)) {
+    return res.status(400).json({ error: 'Invalid gender. Must be "Male" or "Female".' });
+  }
+
+  // Validate date format
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+    return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+  }
+
+  try {
+    const parsedDate = new Date(dateOfBirth + 'T00:00:00Z');
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date' });
+    }
+
+    // Get mother's ID
+    const motherRes = await pool.query(
+      'SELECT id FROM mothers WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (motherRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Mother profile not found. Please complete your profile first.' });
+    }
+    const motherId = motherRes.rows[0].id;
+
+    // Check if baby name already exists for this mother
+    const existingBaby = await pool.query(
+      'SELECT id FROM babies WHERE mother_id = $1 AND baby_name = $2',
+      [motherId, babyName]
+    );
+    
+    if (existingBaby.rows.length > 0) {
+      return res.status(409).json({ error: 'Baby with this name already exists for your account' });
+    }
+
+    // Insert new baby
+    const newBaby = await pool.query(
+      `INSERT INTO babies (mother_id, baby_name, date_of_birth, gender)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, baby_name, date_of_birth, gender`,
+      [motherId, babyName, parsedDate, genderNormalized]
+    );
+
+    // Format the date for response
+    const baby = newBaby.rows[0];
+    const formattedDate = baby.date_of_birth.toISOString().split('T')[0];
+
+    res.status(201).json({
+      message: 'Baby added successfully',
+      baby: {
+        id: baby.id,
+        baby_name: baby.baby_name,
+        date_of_birth: formattedDate,
+        gender: baby.gender
+      }
+    });
+
+  } catch (error) {
+    console.error('Add baby error:', error);
+    res.status(500).json({ error: 'Server error while adding baby' });
+  }
+});
 
 // Get Profile Route
 app.get('/api/profile', authenticateToken, async (req, res) => {
