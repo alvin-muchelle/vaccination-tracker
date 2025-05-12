@@ -1,185 +1,276 @@
-import { useEffect, useState } from "react"
-import { ThemeProvider } from "@/components/theme-provider"
-import { ModeToggle } from "./components/mode-toggle"
-import { DataTable } from "./components/data-table"
-import { columns } from "./components/columns"
-import { SignupForm } from "./components/SignUpForm"
-import { LoginForm } from "./components/LoginForm"
-import { ResetPasswordForm } from "./components/ResetPasswordForm"
-import { ProfileForm } from "./components/ProfileForm"
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import type { Vaccination } from "./components/columns"
+import { useEffect, useState } from "react";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ModeToggle } from "./components/mode-toggle";
+import { DataTable } from "./components/data-table";
+import { columns } from "./components/columns";
+import { SignupForm } from "./components/SignUpForm";
+import { LoginForm } from "./components/LoginForm";
+import { Button } from "@/components/ui/button"
+import { ResetPasswordForm } from "./components/ResetPasswordForm";
+import { ProfileForm } from "./components/ProfileForm";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import type { Vaccination } from "./components/columns";
+import { toast } from "sonner";
 
-// Pull in the backend URL from my env
 const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
 
 interface Baby {
-  id: number
-  baby_name: string
-  date_of_birth: string
-  gender: string
+  id: number;
+  baby_name: string;
+  date_of_birth: string;
+  gender: string;
 }
 
 interface ProfileResponse {
-  mustResetPassword: boolean
-  profileComplete: boolean
-  mother: { id: number; full_name: string; phone_number: string } | null
-  babies: Baby[]
+  mustResetPassword: boolean;
+  profileComplete: boolean;
+  mother: { id: number; full_name: string; phone_number: string } | null;
+  babies: Baby[];
 }
 
 function App() {
-  const [data, setData] = useState<Vaccination[]>([])
-  const [loading, setLoading] = useState(true)
-  const [authToken, setAuthToken] = useState<string | null>(null)
-  const [mustReset, setMustReset] = useState(false)
-  const [profileComplete, setProfileComplete] = useState(false)
-  const [tempToken, setTempToken] = useState<string | null>(null)
-  const [view, setView] = useState<"signup" | "login" | "reset" | "profile" | "dashboard">("signup")
-  const [profile, setProfile] = useState<ProfileResponse | null>(null)
-  const [selectedBabyId, setSelectedBabyId] = useState<number | null>(null)
+  const [data, setData] = useState<Vaccination[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [mustReset, setMustReset] = useState(false);
+  const [profileComplete, setProfileComplete] = useState(false);
+  const [tempToken, setTempToken] = useState<string | null>(null);
+  const [view, setView] = useState<"signup" | "login" | "reset" | "profile" | "dashboard">("signup");
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [selectedBabyId, setSelectedBabyId] = useState<number | undefined>(undefined);
 
-  // load token
+  // Load token from localStorage on initial render
   useEffect(() => {
-    const stored = localStorage.getItem("authToken")
-    if (stored) setAuthToken(stored)
-  }, [])
+    const storedToken = localStorage.getItem("authToken");
+    if (storedToken) {
+      setAuthToken(storedToken);
+    }
+  }, []);
 
-  // fetch profile status and data
+  // Fetch profile and determine the correct view
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!authToken) return
+    const fetchProfileAndDetermineView = async () => {
+      if (!authToken) return;
+
       try {
         const res = await fetch(`${API_BASE}/api/profile`, {
           headers: { Authorization: `Bearer ${authToken}` },
-        })
-        if (res.ok) {
-          const json: ProfileResponse = await res.json()
-          setMustReset(json.mustResetPassword)
-          setProfileComplete(json.profileComplete)
-          setProfile(json)
-          // default-select first baby
-          if (json.babies.length) setSelectedBabyId(json.babies[0].id)
-          // decide view
-          if (json.mustResetPassword) setView("reset")
-          else if (!json.profileComplete) setView("profile")
-          else setView("dashboard")
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+
+        const json: ProfileResponse = await res.json();
+        setMustReset(json.mustResetPassword);
+        setProfileComplete(json.profileComplete);
+        setProfile(json);
+
+        // Set default baby if available
+        if (json.babies.length > 0) {
+          setSelectedBabyId(json.babies[0].id);
+        }
+
+        // Determine view based on profile status
+        if (json.mustResetPassword) {
+          setView("reset");
+        } else if (!json.profileComplete) {
+          setView("profile");
+        } else {
+          setView("dashboard");
         }
       } catch (e) {
-        console.error(e)
+        console.error("Failed to fetch profile:", e);
+        toast.error("Failed to load profile data"); // Updated toast usage
       }
-    }
-    fetchProfile()
-  }, [authToken])
+    };
 
-  // fetch schedule
+    fetchProfileAndDetermineView();
+  }, [authToken]);
+
+  // Fetch vaccination schedule when appropriate
   useEffect(() => {
     const fetchSchedule = async () => {
-      if (!authToken || mustReset || !profileComplete) return
-      setLoading(true)
+      if (!authToken || mustReset || !profileComplete) return;
+
+      setLoading(true);
       try {
         const res = await fetch(`${API_BASE}/api/vaccination-schedule`, {
           headers: { Authorization: `Bearer ${authToken}` },
-        })
-        if (res.ok) {
-          setData(await res.json())
-        }
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchSchedule()
-  }, [authToken, mustReset, profileComplete])
+        });
 
-  // schedule reminders when entering dashboard
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+
+        setData(await res.json());
+      } catch (e) {
+        console.error("Failed to fetch schedule:", e);
+        toast.error("Failed to load vaccination schedule"); // Updated toast usage
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSchedule();
+  }, [authToken, mustReset, profileComplete]);
+
+  // Schedule reminders when entering dashboard
   useEffect(() => {
-    if (view === "dashboard" && authToken && selectedBabyId !== undefined) {
-      fetch(`${API_BASE}/api/reminder/${selectedBabyId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-      })
-        .then(res => {
-          if (!res.ok) throw new Error("reminder scheduling failed")
-          return res.json()
-        })
-        .then(j => console.log("reminder scheduled:", j))
-        .catch(err => console.error("could not schedule reminders:", err))
+    const scheduleReminders = async () => {
+      if (view !== "dashboard" || !authToken || !selectedBabyId) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/reminder/${selectedBabyId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error("Reminder scheduling failed");
+        }
+
+        console.log("Reminder scheduled successfully");
+      } catch (err) {
+        console.error("Could not schedule reminders:", err);
+        toast.warning("Failed to schedule reminders"); // Updated toast usage
+      }
+    };
+
+    scheduleReminders();
+  }, [view, authToken, selectedBabyId]);
+
+  const handleProfileComplete = async () => {
+  try {
+    // Refresh profile data after completion
+    const res = await fetch(`${API_BASE}/api/profile`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    
+    if (res.ok) {
+      const json: ProfileResponse = await res.json();
+      setProfile(json);
+      setProfileComplete(true);
+      
+      // Set default baby if available
+      if (json.babies.length > 0) {
+        setSelectedBabyId(json.babies[0].id);
+      }
+      
+      setView("dashboard");
+    } else {
+      throw new Error("Failed to fetch updated profile");
     }
-  }, [view, authToken, selectedBabyId])
+  } catch (error) {
+    console.error("Profile completion error:", error);
+    toast.error("Failed to load baby data");
+    // Stay on profile page if there's an error
+  }
+};
 
   function renderView() {
     switch (view) {
       case "signup":
         return (
           <SignupForm
-            onSignupSuccess={t => { setTempToken(t); setView("reset") }}
+            onSignupSuccess={t => { 
+              setTempToken(t);
+              setView("reset");
+            }}
             onSwitchToLogin={() => setView("login")}
           />
-        )
+        );
       case "reset":
         return (
           <ResetPasswordForm
-            token={tempToken ?? ""}
-            onResetComplete={() => { setTempToken(null); setView("login") }}
+            token={tempToken || authToken || ""}
+            onResetComplete={() => { setTempToken(null); setView("login"); }}
           />
-        )
+        );
       case "login":
         return (
           <LoginForm
             onLoginSuccess={(token, must) => {
-              setAuthToken(token)
-              setMustReset(must)
-              if (must) { setView("reset"); return }
-              setAuthToken(token)
+              localStorage.setItem("authToken", token);
+              setAuthToken(token);
+              setMustReset(must);
+              if (must) {
+                setView("reset");
+              }
             }}
+            onSwitchToSignup={() => setView("signup")}
           />
-        )
+        );
       case "profile":
         return authToken ? (
           <ProfileForm
             token={authToken}
-            onProfileComplete={() => { setProfileComplete(true); setView("dashboard") }}
+            onProfileComplete={handleProfileComplete}
           />
-        ) : <p>Unauthorized</p>
+        ) : <p>Unauthorized</p>;
       case "dashboard":
-        if (!profile) return <p>Loading profile…</p>
-        return loading ? <p>Loading schedule…</p> : (
-          <div className="space-y-4">
-            <Select
-              onValueChange={val => setSelectedBabyId(Number(val))}
-              defaultValue={selectedBabyId !== null ? String(selectedBabyId) : undefined}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Choose baby" />
-              </SelectTrigger>
-              <SelectContent>
-                {profile.babies.map(b => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.baby_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        if (!profile) return <p>Loading profile…</p>;
+        if (loading) return <p>Loading schedule…</p>;
+        
+        // Wait until we have baby data
+        if (!profile.babies || profile.babies.length === 0) {
+          return (
+            <div className="text-center py-8">
+              <p className="text-lg mb-4">No baby data available</p>
+              <Button 
+                onClick={() => setView("profile")}
+                variant="outline"
+              >
+                Add Baby Information
+              </Button>
+            </div>
+          );
+        }
 
-            {selectedBabyId !== null && (
-              <DataTable
-                columns={columns}
-                data={data}
-                initialBirthDate={
-                  profile.babies.find(b => b.id === selectedBabyId)!.date_of_birth
-                }
-                babyId={selectedBabyId}
-                authToken={authToken!}
-              />
+        // Find selected baby or default to first baby
+        const selectedBaby = (selectedBabyId 
+          ? profile.babies.find(b => b.id === selectedBabyId)
+          : profile.babies[0]) || profile.babies[0]; // Fallback to first baby if undefined
+
+        // Final safety check - should theoretically never hit this if babies.length > 0
+        if (!selectedBaby) {
+          return <p>Error: No valid baby selected</p>;
+        }
+
+        return (
+          <div className="space-y-4">
+            {profile.babies.length > 1 && (
+              <Select
+                onValueChange={val => setSelectedBabyId(Number(val))}
+                value={String(selectedBaby.id)} // Now guaranteed to have value
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Choose baby" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profile.babies.map(b => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.baby_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
+
+            <DataTable
+              columns={columns}
+              data={data}
+              initialBirthDate={selectedBaby.date_of_birth}
+              babyId={selectedBaby.id}
+              authToken={authToken!}
+            />
           </div>
-        )
+        );
       default:
-        return null
+        return null;
     }
   }
 
@@ -188,18 +279,16 @@ function App() {
       <div className="p-6">
         <ModeToggle />
         <h1 className="text-2xl font-bold mb-4 text-center">
-          {{
-            signup: "Welcome to Chanjo",
-            reset: "Reset Password",
-            login: "Log In",
-            profile: "Complete Your Profile",
-            dashboard: "Vaccination Schedule"
-          }[view]}
+          {view === "signup" ? "Welcome to Chanjo Chonjo!" : 
+           view === "login" ? "Log In" :
+           view === "reset" ? "Reset Password" :
+           view === "profile" ? "Complete Your Profile" :
+           "Vaccination Schedule"}
         </h1>
         {renderView()}
       </div>
     </ThemeProvider>
-  )
+  );
 }
 
-export default App
+export default App;

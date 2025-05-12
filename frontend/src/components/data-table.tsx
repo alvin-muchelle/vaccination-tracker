@@ -41,7 +41,7 @@ interface DataTableProps {
   columns: ColumnDef<Vaccination, any>[]
   data: Vaccination[]
   initialBirthDate?: string
-  babyId: number
+  babyId?: number
   authToken: string
 }
 

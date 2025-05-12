@@ -562,7 +562,7 @@ async function sendCombinedReminderEmail(email, fullName, reminders) {
 }
 
 // weekly job at 1400hrs every day
-cron.schedule('* * * * *', async () => {
+cron.schedule('0 14 * * *', async () => {
   const now = new Date();
   const res = await pool.query(
     `SELECT r.id, r.vaccine, r.vaccination_date, m.full_name, u.email
