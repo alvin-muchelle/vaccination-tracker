@@ -226,8 +226,6 @@ function authenticateToken(req, res, next) {
       }
       return res.status(403).json({ error: 'Invalid token' });
     }
-    // Add token invalidation check here
-    req.user = user;
     next();
   });
 }

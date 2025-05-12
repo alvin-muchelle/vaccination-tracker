@@ -1,0 +1,22 @@
+.
+├── backend
+│   ├── package-lock.json
+│   ├── package.json
+│   └── server.js
+├── backup.sql
+├── folder-structure
+└── frontend
+    ├── README.md
+    ├── components.json
+    ├── eslint.config.js
+    ├── index.html
+    ├── package-lock.json
+    ├── package.json
+    ├── public
+    ├── src
+    ├── tsconfig.app.json
+    ├── tsconfig.json
+    ├── tsconfig.node.json
+    └── vite.config.ts
+
+5 directories, 15 files
