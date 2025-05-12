@@ -138,7 +138,6 @@ export function DataTable({
               mode="single"
               selected={birthDate ? new Date(birthDate) : undefined}
               onSelect={handleDateSelect}
-              initialFocus
             />
           </PopoverContent>
         </Popover>
