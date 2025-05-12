@@ -20,6 +20,9 @@ import {
   FormControl,
 } from "@/components/ui/form"
 
+// Pull in the backend URL from my env
+const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
+
 const schema = z.object({
     fullName: z.string().min(1, "Full name is required"),
     phoneNumber: z.string().min(1, "Phone number is required"),
@@ -43,7 +46,7 @@ export function ProfileForm({
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
-      const res = await fetch("http://localhost:5000/api/profile", {
+      const res = await fetch(`${API_BASE}/api/profile`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

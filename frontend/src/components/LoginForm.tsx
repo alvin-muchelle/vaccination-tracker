@@ -13,6 +13,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
+// Pull in the backend URL from my env
+const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
+
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -32,7 +35,7 @@ export function LoginForm({ onLoginSuccess }: Props) {
   const handleLogin = async (values: z.infer<typeof loginSchema>) => {
     setErrorMsg("")
     try {
-      const res = await fetch("http://localhost:5000/api/login", {
+      const res = await fetch(`${API_BASE}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),

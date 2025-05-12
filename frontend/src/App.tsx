@@ -10,6 +10,9 @@ import { ProfileForm } from "./components/ProfileForm"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import type { Vaccination } from "./components/columns"
 
+// Pull in the backend URL from my env
+const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
+
 interface Baby {
   id: number
   baby_name: string
@@ -46,7 +49,7 @@ function App() {
     const fetchProfile = async () => {
       if (!authToken) return
       try {
-        const res = await fetch("http://localhost:5000/api/profile", {
+        const res = await fetch(`${API_BASE}/api/profile`, {
           headers: { Authorization: `Bearer ${authToken}` },
         })
         if (res.ok) {
@@ -74,7 +77,7 @@ function App() {
       if (!authToken || mustReset || !profileComplete) return
       setLoading(true)
       try {
-        const res = await fetch("http://localhost:5000/api/vaccination-schedule", {
+        const res = await fetch(`${API_BASE}/api/vaccination-schedule`, {
           headers: { Authorization: `Bearer ${authToken}` },
         })
         if (res.ok) {
@@ -92,7 +95,7 @@ function App() {
   // schedule reminders when entering dashboard
   useEffect(() => {
     if (view === "dashboard" && authToken && selectedBabyId !== undefined) {
-      fetch(`http://localhost:5000/api/reminder/${selectedBabyId}`, {
+      fetch(`${API_BASE}/api/reminder/${selectedBabyId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

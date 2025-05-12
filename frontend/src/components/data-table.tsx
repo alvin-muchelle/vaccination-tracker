@@ -11,6 +11,9 @@ import { CalendarIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 
+// Pull in the backend URL from my env
+const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
+
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -90,7 +93,7 @@ export function DataTable({
     setBirthDate(iso)
     setPopoverOpen(false)
 
-    await fetch(`http://localhost:5000/api/baby/${babyId}/birth-date`, {
+    await fetch(`${API_BASE}/api/baby/${babyId}/birth-date`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

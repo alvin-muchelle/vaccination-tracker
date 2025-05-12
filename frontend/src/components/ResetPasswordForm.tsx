@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 
+// Pull in the backend URL from my env
+const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
+
 const resetSchema = z
   .object({
     tempPassword: z.string().min(6, "Temporary password is required"),
@@ -42,7 +45,7 @@ export function ResetPasswordForm({ token, onResetComplete }: ResetPasswordFormP
 
   const handleReset = async (values: z.infer<typeof resetSchema>) => {
     try {
-      const res = await fetch("http://localhost:5000/api/reset-password", {
+      const res = await fetch(`${API_BASE}/api/reset-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

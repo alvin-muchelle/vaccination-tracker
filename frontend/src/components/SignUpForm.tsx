@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 
+// Pull in the backend URL from my env
+const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
+
 const emailSchema = z.object({
   email: z.string().email("Enter a valid email"),
 })
@@ -37,7 +40,7 @@ export function SignupForm({ onSignupSuccess, onSwitchToLogin }: Props) {
     setSending(true)
     setMessage("")
     try {
-      const res = await fetch("http://localhost:5000/api/signup", {
+      const res = await fetch(`${API_BASE}/api/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: values.email }),
