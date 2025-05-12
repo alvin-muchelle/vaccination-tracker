@@ -226,9 +226,14 @@ function authenticateToken(req, res, next) {
       }
       return res.status(403).json({ error: 'Invalid token' });
     }
+
+    // Attach the decoded user payload to req.user
+    req.user = user; 
+
     next();
   });
 }
+
 
 // Create/Update Profile Route
 app.post('/api/profile', authenticateToken, async (req, res) => {
