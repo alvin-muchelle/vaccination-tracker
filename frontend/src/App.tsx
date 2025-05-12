@@ -8,6 +8,7 @@ import { LoginForm } from "./components/LoginForm";
 import { Button } from "@/components/ui/button"
 import { ResetPasswordForm } from "./components/ResetPasswordForm";
 import { ProfileForm } from "./components/ProfileForm";
+import { AddBabyForm } from "./components/AddBabyForm";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import type { Vaccination } from "./components/columns";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ function App() {
   const [view, setView] = useState<"signup" | "login" | "reset" | "profile" | "dashboard">("signup");
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [selectedBabyId, setSelectedBabyId] = useState<number | undefined>(undefined);
+  const [showAddBabyForm, setShowAddBabyForm] = useState(false);
 
   // Load token from localStorage on initial render
   useEffect(() => {
@@ -215,7 +217,6 @@ function App() {
         if (!profile) return <p>Loading profile…</p>;
         if (loading) return <p>Loading schedule…</p>;
         
-        // Wait until we have baby data
         if (!profile.babies || profile.babies.length === 0) {
           return (
             <div className="text-center py-8">
@@ -230,34 +231,81 @@ function App() {
           );
         }
 
-        // Find selected baby or default to first baby
+        const handleBabyAdded = async () => {
+          try {
+            // Refresh profile data after adding a baby
+            const res = await fetch(`${API_BASE}/api/profile`, {
+              headers: { Authorization: `Bearer ${authToken}` },
+            });
+            
+            if (res.ok) {
+              const json: ProfileResponse = await res.json();
+              setProfile(json);
+              
+              // Select the newly added baby (last in the array)
+              if (json.babies.length > 0) {
+                setSelectedBabyId(json.babies[json.babies.length - 1].id);
+              }
+              
+              toast.success("Baby added successfully!");
+            } else {
+              throw new Error("Failed to refresh profile");
+            }
+          } catch (error) {
+            console.error("Failed to refresh profile:", error);
+            toast.error("Failed to load updated baby data");
+          } finally {
+            setShowAddBabyForm(false);
+          }
+        };
+
         const selectedBaby = (selectedBabyId 
           ? profile.babies.find(b => b.id === selectedBabyId)
-          : profile.babies[0]) || profile.babies[0]; // Fallback to first baby if undefined
+          : profile.babies[0]) || profile.babies[0];
 
-        // Final safety check - should theoretically never hit this if babies.length > 0
         if (!selectedBaby) {
           return <p>Error: No valid baby selected</p>;
         }
 
         return (
           <div className="space-y-4">
-            {profile.babies.length > 1 && (
-              <Select
-                onValueChange={val => setSelectedBabyId(Number(val))}
-                value={String(selectedBaby.id)} // Now guaranteed to have value
+            <div className="flex justify-between items-center">
+              {profile.babies.length > 1 ? (
+                <Select
+                  onValueChange={val => setSelectedBabyId(Number(val))}
+                  value={String(selectedBaby.id)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Choose baby" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profile.babies.map(b => (
+                      <SelectItem key={b.id} value={String(b.id)}>
+                        {b.baby_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-lg font-medium">
+                  {profile.babies[0].baby_name}'s Vaccination Schedule
+                </div>
+              )}
+              
+              <Button 
+                onClick={() => setShowAddBabyForm(!showAddBabyForm)}
+                variant="outline"
+                className="ml-auto"
               >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Choose baby" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profile.babies.map(b => (
-                    <SelectItem key={b.id} value={String(b.id)}>
-                      {b.baby_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {showAddBabyForm ? "Cancel" : "Add Another Baby"}
+              </Button>
+            </div>
+
+            {showAddBabyForm && authToken && (
+              <AddBabyForm 
+                token={authToken} 
+                onSuccess={handleBabyAdded} 
+              />
             )}
 
             <DataTable
