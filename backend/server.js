@@ -62,7 +62,10 @@ const app = express();
 const port = process.env.PORT;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
 app.use(express.json());
 
 // PostgreSQL connection setup
