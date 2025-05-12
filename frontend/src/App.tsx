@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { ResetPasswordForm } from "./components/ResetPasswordForm";
 import { ProfileForm } from "./components/ProfileForm";
 import { AddBabyForm } from "./components/AddBabyForm";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
 import type { Vaccination } from "./components/columns";
 import { toast } from "sonner";
 
@@ -38,7 +38,7 @@ function App() {
   const [tempToken, setTempToken] = useState<string | null>(null);
   const [view, setView] = useState<"signup" | "login" | "reset" | "profile" | "dashboard">("signup");
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
-  const [selectedBabyId, setSelectedBabyId] = useState<number | undefined>(undefined);
+  const [selectedBabyId, setSelectedBabyId] = useState<number | null>(null);
   const [showAddBabyForm, setShowAddBabyForm] = useState(false);
 
   // Load token from localStorage on initial render
@@ -172,6 +172,33 @@ function App() {
     // Stay on profile page if there's an error
   }
 };
+  const handleBabyAdded = async () => {
+    try {
+      // Refresh profile data
+      const res = await fetch(`${API_BASE}/api/profile`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      
+      if (res.ok) {
+        const json: ProfileResponse = await res.json();
+        setProfile(json);
+        
+        // Select the newly added baby (last in the array)
+        if (json.babies.length > 0) {
+          setSelectedBabyId(json.babies[json.babies.length - 1].id);
+        }
+        
+        toast.success("Baby added successfully!");
+      } else {
+        throw new Error("Failed to refresh profile");
+      }
+    } catch (error) {
+      console.error("Failed to refresh profile:", error);
+      toast.error("Failed to load updated baby data");
+    } finally {
+      setShowAddBabyForm(false);
+    }
+  };
 
   function renderView() {
     switch (view) {
@@ -231,34 +258,6 @@ function App() {
           );
         }
 
-        const handleBabyAdded = async () => {
-          try {
-            // Refresh profile data after adding a baby
-            const res = await fetch(`${API_BASE}/api/profile`, {
-              headers: { Authorization: `Bearer ${authToken}` },
-            });
-            
-            if (res.ok) {
-              const json: ProfileResponse = await res.json();
-              setProfile(json);
-              
-              // Select the newly added baby (last in the array)
-              if (json.babies.length > 0) {
-                setSelectedBabyId(json.babies[json.babies.length - 1].id);
-              }
-              
-              toast.success("Baby added successfully!");
-            } else {
-              throw new Error("Failed to refresh profile");
-            }
-          } catch (error) {
-            console.error("Failed to refresh profile:", error);
-            toast.error("Failed to load updated baby data");
-          } finally {
-            setShowAddBabyForm(false);
-          }
-        };
-
         const selectedBaby = (selectedBabyId 
           ? profile.babies.find(b => b.id === selectedBabyId)
           : profile.babies[0]) || profile.babies[0];
@@ -269,36 +268,32 @@ function App() {
 
         return (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              {profile.babies.length > 1 ? (
-                <Select
-                  onValueChange={val => setSelectedBabyId(Number(val))}
-                  value={String(selectedBaby.id)}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Choose baby" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profile.babies.map(b => (
-                      <SelectItem key={b.id} value={String(b.id)}>
-                        {b.baby_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="text-lg font-medium">
-                  {profile.babies[0].baby_name}'s Vaccination Schedule
-                </div>
-              )}
+            <div className="flex flex-col items-center gap-4">
+              <h1 className="text-2xl font-bold mb-4 text-center">
+                {selectedBaby.baby_name}'s Vaccination Schedule
+              </h1>
               
-              <Button 
-                onClick={() => setShowAddBabyForm(!showAddBabyForm)}
-                variant="outline"
-                className="ml-auto"
-              >
-                {showAddBabyForm ? "Cancel" : "Add Another Baby"}
-              </Button>
+              <div className="flex w-full justify-between items-center">
+                {profile.babies.length > 1 && (
+                  <Select
+                    onValueChange={val => setSelectedBabyId(Number(val))}
+                    value={selectedBabyId ? String(selectedBabyId) : ""}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <div className="w-full text-left font-normal text-muted-foreground">
+                        Choose baby
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {profile.babies.map(b => (
+                        <SelectItem key={b.id} value={String(b.id)}>
+                          {b.baby_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </div>
 
             {showAddBabyForm && authToken && (
@@ -328,10 +323,10 @@ function App() {
         <ModeToggle />
         <h1 className="text-2xl font-bold mb-4 text-center">
           {view === "signup" ? "Welcome to Chanjo Chonjo!" : 
-           view === "login" ? "Log In" :
-           view === "reset" ? "Reset Password" :
-           view === "profile" ? "Complete Your Profile" :
-           "Vaccination Schedule"}
+          view === "login" ? "Log In" :
+          view === "reset" ? "Reset Password" :
+          view === "profile" ? "Complete Your Profile" :
+          ""}
         </h1>
         {renderView()}
       </div>

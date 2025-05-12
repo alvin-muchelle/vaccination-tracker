@@ -122,11 +122,6 @@ export function DataTable({
 
   return (
     <div>
-      <div className="py-4 text-sm text-muted-foreground">
-        <p><strong>* Rotavirus 3rd dose alternate schedule</strong></p>
-        <p><strong>** Vitamin A is given after every 6 months up to 5 years and lactating months too.</strong></p>
-        <p><strong>*** One Dose Annually</strong></p>
-      </div>
       <div className="flex items-center py-4">
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger asChild>
@@ -136,7 +131,6 @@ export function DataTable({
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-2 space-y-2" align="start">
-            <p className="text-sm text-muted-foreground px-1">Has the baby’s birth date changed?</p>
             <Calendar
               mode="single"
               selected={birthDate ? new Date(birthDate) : undefined}
@@ -192,10 +186,18 @@ export function DataTable({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
-        <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
+      <div>
+        <div className="py-4 text-sm text-muted-foreground">
+          <p><strong>* Rotavirus 3rd dose alternate schedule</strong></p>
+          <p><strong>** Vitamin A is given after every 6 months up to 5 years and lactating months too.</strong></p>
+          <p><strong>*** One Dose Annually</strong></p>
+        </div>
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
+          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
+        </div>
       </div>
+        
     </div>
   )
 }
