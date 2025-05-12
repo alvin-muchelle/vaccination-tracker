@@ -62,10 +62,7 @@ const app = express();
 const port = process.env.PORT;
 
 // Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
 // PostgreSQL connection setup
@@ -616,7 +613,6 @@ cron.schedule('0 14 * * *', async () => {
 });
 
 // Start the server
-const PORT = parseInt(process.env.PORT || '8080', 10);
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on 0.0.0.0:${PORT}`);
+app.listen(port, '::', () => {
+    console.log(`Server running on [::]${port}`);
 });
