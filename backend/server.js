@@ -62,7 +62,9 @@ const app = express();
 const port = process.env.PORT;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: "https://chanjo-chonjo.netlify.app/" 
+}));
 app.use(express.json());
 
 // PostgreSQL connection setup
@@ -301,7 +303,6 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Server error while saving profile' });
   }
 });
-
 
 // Get Profile Route
 app.get('/api/profile', authenticateToken, async (req, res) => {
