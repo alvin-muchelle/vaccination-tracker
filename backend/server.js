@@ -295,6 +295,9 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
     console.error('Profile error:', error);
     res.status(500).json({ error: 'Server error while saving profile' });
   }
+  console.log('>>> Headers:', req.headers);
+  console.log('>>> req.user:', req.user);
+  console.log('>>> body:', req.body);
 });
 
 
