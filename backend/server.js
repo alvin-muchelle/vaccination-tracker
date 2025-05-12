@@ -474,7 +474,7 @@ app.post('/api/reminder/:babyId', authenticateToken, async (req, res) => {
   if (Number.isNaN(babyId)) {
     return res.status(400).json({ error: "Invalid babyId parameter" });
   }
-  
+
   try {
     // verify baby belongs to this user
     const vb = await pool.query(
@@ -562,7 +562,7 @@ async function sendCombinedReminderEmail(email, fullName, reminders) {
 }
 
 // weekly job at 1400hrs every day
-cron.schedule('0 14 * * *', async () => {
+cron.schedule('* * * * *', async () => {
   const now = new Date();
   const res = await pool.query(
     `SELECT r.id, r.vaccine, r.vaccination_date, m.full_name, u.email
