@@ -62,9 +62,7 @@ const app = express();
 const port = process.env.PORT;
 
 // Middleware
-app.use(cors({
-  origin: "https://chanjo-chonjo.netlify.app/" 
-}));
+app.use(cors());
 app.use(express.json());
 
 // PostgreSQL connection setup
