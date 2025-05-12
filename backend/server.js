@@ -471,6 +471,10 @@ app.post('/api/reminder/:babyId', authenticateToken, async (req, res) => {
   const userId   = req.user.userId;
   const babyId   = parseInt(req.params.babyId, 10);
 
+  if (Number.isNaN(babyId)) {
+    return res.status(400).json({ error: "Invalid babyId parameter" });
+  }
+  
   try {
     // verify baby belongs to this user
     const vb = await pool.query(
