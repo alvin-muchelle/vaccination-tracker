@@ -50,28 +50,16 @@ export function SignupForm({ onSignupSuccess, onSwitchToLogin }: Props) {
       if (res.ok) {
         setMessage("Temporary password sent. Check your email.")
         onSignupSuccess(data.token)
+      } else {
+        setMessage(data.message || "Signup failed.")
       }
-      if (!res.ok) {
-      // Try to get error message from response
-      let errorData;
-      try {
-        errorData = await res.json();
-      } catch {
-        errorData = { message: await res.text() };
-      }
-      throw new Error(errorData.message || `HTTP error! status: ${res.status}`);
+    } catch (err) {
+      console.error(err)
+      setMessage("Error sending email.")
+    } finally {
+      setSending(false)
     }
-
-    const error_data = await res.json();
-    setMessage("Temporary password sent. Check your email.");
-    onSignupSuccess(error_data.token);
-  } catch (err) {
-    console.error("Signup error:", err);
-    setMessage(err instanceof Error ? err.message : "Error sending email.");
-  } finally {
-    setSending(false);
   }
-};
 
   return (
     <div className="max-w-md mx-auto mt-10">
