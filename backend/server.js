@@ -215,17 +215,20 @@ app.post('/api/login', async (req, res) => {
 // Middleware for JWT verification
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader?.split(' ')[1];
+  console.log('--- authHeader:', authHeader);
 
-  if (!token) return res.sendStatus(401);
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.JWT_SECRET, (err, payload) => {
     if (err) {
-      if (err.name === 'TokenExpiredError') {
-        return res.status(401).json({ error: 'Token expired' });
-      }
+      console.error('JWT verify error:', err);
       return res.status(403).json({ error: 'Invalid token' });
     }
+    console.log('--- JWT payload:', payload);
+    req.user = payload;
     next();
   });
 }
@@ -295,9 +298,6 @@ app.post('/api/profile', authenticateToken, async (req, res) => {
     console.error('Profile error:', error);
     res.status(500).json({ error: 'Server error while saving profile' });
   }
-  console.log('>>> Headers:', req.headers);
-  console.log('>>> req.user:', req.user);
-  console.log('>>> body:', req.body);
 });
 
 
