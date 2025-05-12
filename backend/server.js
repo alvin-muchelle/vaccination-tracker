@@ -616,6 +616,7 @@ cron.schedule('0 14 * * *', async () => {
 });
 
 // Start the server
-app.listen(port, '::', () => {
-    console.log(`Server running on [::]${port}`);
+const PORT = parseInt(process.env.PORT || '8080', 10);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on 0.0.0.0:${PORT}`);
 });
