@@ -1,3 +1,4 @@
+setup_schema.js
 backup.sql
 folder-structure.txt
 troubleshoot.txt
@@ -5,3 +6,6 @@ frontend/node_modules/
 frontend/.env
 backend/node_modules/
 backend/.env
+backend/db.js
+s.js
+backend/test.js
