@@ -536,3 +536,8 @@ async function sendPasswordResetConfirmation(email) {
     html: `...`
   });
 }
+
+// Start the server
+app.listen(port, '::', () => {
+    console.log(`Server running on [::]${port}`);
+});
