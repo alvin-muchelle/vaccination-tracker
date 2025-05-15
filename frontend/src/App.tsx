@@ -26,7 +26,7 @@ interface Baby {
 interface ProfileResponse {
   mustResetPassword: boolean;
   profileComplete: boolean;
-  mother: { id: number; full_name: string; phone_number: string } | null;
+  mother: { id: string; full_name: string; phone_number: string } | null;
   babies: Baby[];
 }
 
@@ -288,7 +288,7 @@ function App() {
                 {profile.babies.length > 1 && (
                   <Select
                     onValueChange={val => setSelectedBabyId(val)}
-                    value={selectedBabyId ? String(selectedBabyId) : ""}
+                    value={selectedBabyId ? selectedBabyId : ""}
                   >
                     <SelectTrigger className="w-[200px]">
                       <div className="w-full text-left font-normal text-muted-foreground">
