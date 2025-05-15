@@ -15,8 +15,9 @@ import { toast } from "sonner";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
 
+
 interface Baby {
-  id: number;
+  id: string;
   baby_name: string;
   date_of_birth: string;
   gender: string;
@@ -38,7 +39,7 @@ function App() {
   const [tempToken, setTempToken] = useState<string | null>(null);
   const [view, setView] = useState<"signup" | "login" | "reset" | "profile" | "dashboard">("signup");
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
-  const [selectedBabyId, setSelectedBabyId] = useState<number | null>(null);
+  const [selectedBabyId, setSelectedBabyId] = useState<string | null>(null);
   const [showAddBabyForm, setShowAddBabyForm] = useState(false);
 
   // Load token from localStorage on initial render
@@ -53,7 +54,6 @@ function App() {
   useEffect(() => {
     const fetchProfileAndDetermineView = async () => {
       if (!authToken) return;
-
       try {
         const res = await fetch(`${API_BASE}/api/profile`, {
           headers: { Authorization: `Bearer ${authToken}` },
@@ -83,7 +83,7 @@ function App() {
         }
       } catch (e) {
         console.error("Failed to fetch profile:", e);
-        toast.error("Failed to load profile data"); // Updated toast usage
+        toast.error("Failed to load profile data");
       }
     };
 
@@ -280,14 +280,14 @@ function App() {
                 <Button 
                   onClick={() => setShowAddBabyForm(!showAddBabyForm)}
                   variant="outline"
-                  className="whitespace-nowrap" /* Prevent text wrapping */
+                  className="whitespace-nowrap border-primary"
                 >
                   {showAddBabyForm ? "Cancel" : "Add Another Baby"}
                 </Button>
 
                 {profile.babies.length > 1 && (
                   <Select
-                    onValueChange={val => setSelectedBabyId(Number(val))}
+                    onValueChange={val => setSelectedBabyId(val)}
                     value={selectedBabyId ? String(selectedBabyId) : ""}
                   >
                     <SelectTrigger className="w-[200px]">
@@ -297,7 +297,7 @@ function App() {
                     </SelectTrigger>
                     <SelectContent>
                       {profile.babies.map(b => (
-                        <SelectItem key={b.id} value={String(b.id)}>
+                        <SelectItem key={b.id} value={(b.id)}>
                           {b.baby_name}
                         </SelectItem>
                       ))}

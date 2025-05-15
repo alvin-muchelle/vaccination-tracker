@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -43,27 +44,35 @@ export function ProfileForm({
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
   })
+  const [serverError, setServerError] = useState<string | null>(null)
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/profile`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(values),
-      })
+  try {
+    setServerError(null) // Clear any previous error
 
-      if (res.ok) {
-        onProfileComplete()
-      } else {
-        console.error("Profile submission failed")
-      }
-    } catch (err) {
-      console.error(err)
+    const res = await fetch(`${API_BASE}/api/profile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(values),
+    })
+
+    const data = await res.json()
+
+    if (res.ok) {
+      onProfileComplete()
+    } else {
+      // If Express returned { error: "..." }
+      setServerError(data.error || "Something went wrong")
     }
+  } catch (err) {
+    setServerError("Network error. Please try again.")
+    console.error(err)
   }
+}
+
 
     return (
         <div className="max-w-md mx-auto mt-10">
@@ -145,6 +154,11 @@ export function ProfileForm({
                             </FormItem>
                         )}
                     />
+                    {serverError && (
+                      <div className="text-red-600 text-sm mb-4 text-center">
+                        {serverError}
+                      </div>
+                    )}
                     <div className="flex justify-center">
                         <Button type="submit">Save Profile</Button>
                     </div>

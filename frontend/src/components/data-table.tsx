@@ -41,7 +41,7 @@ interface DataTableProps {
   columns: ColumnDef<Vaccination, any>[]
   data: Vaccination[]
   initialBirthDate?: string
-  babyId?: number
+  babyId?: string
   authToken: string
 }
 
@@ -126,7 +126,7 @@ export function DataTable({
         <div className="flex items-center gap-4">
           <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="max-w-xs w-[220px] justify-start text-left font-normal text-muted-foreground">
+              <Button variant="outline" className="max-w-xs w-[220px] justify-start text-left font-normal text-muted-foreground border-primary">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 Pick a new birth date
               </Button>
@@ -145,10 +145,10 @@ export function DataTable({
           placeholder="Search for a vaccine"
           value={(table.getColumn("vaccine")?.getFilterValue() as string) ?? ""}
           onChange={e => table.getColumn("vaccine")?.setFilterValue(e.target.value)}
-          className="max-w-sm"
+          className="max-w-sm border-primary"
         />
       </div>
-      <div className="overflow-x-auto w-full rounded-md border">
+      <div className="overflow-x-auto w-full rounded-md border border-primary">
         <Table className="min-w-full table-fixed">
           <TableHeader>
             {table.getHeaderGroups().map(hg => (
@@ -156,7 +156,7 @@ export function DataTable({
                 {hg.headers.map(header => (
                   <TableHead
                     key={header.id}
-                    className="relative border border-gray-200 px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                    className="relative border border-primary px-2 py-1 truncate whitespace-nowrap overflow-hidden text-ellipsis"
                     style={{ width: header.getSize(), minWidth: header.getSize() }}
                   >
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
@@ -174,7 +174,7 @@ export function DataTable({
                     <TableCell
                       key={cell.id}
                       style={{ width: cell.column.getSize(), minWidth: cell.column.getSize() }}
-                      className="truncate whitespace-nowrap overflow-hidden text-ellipsis border border-gray-200 px-2 py-1"
+                      className="truncate whitespace-nowrap overflow-hidden text-ellipsis border border-primary px-2 py-1"
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
