@@ -41,27 +41,7 @@ const startServer = async () => {
     const port = process.env.PORT || 3000;
 
     // Middleware
-
-    // whitelist Netlify app and localhost
-    const allowedOrigins = [
-      "https://chanjo-chonjo.netlify.app",
-      "http://localhost:5173",
-    ];
-    app.use(
-      cors({
-        origin: (origin, callback) => {
-          // allow requests with no origin (e.g. mobile apps, curl)
-          if (!origin) return callback(null, true);
-          if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-          }
-          callback(new Error("Not allowed by CORS"));
-        },
-        credentials: true,
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-      })
-    );
+    app.use(cors());
     app.use(express.json());
 
     // Routes
