@@ -1,4 +1,4 @@
-# Chanjo Vaccination Tracker
+# Chanjo Chonjo Vaccination Tracker
 
 A full-stack application that help mothers track and schedule their babies' vaccinations, with automated reminders via email.
 
@@ -23,44 +23,43 @@ A full-stack application that help mothers track and schedule their babies' vacc
 .
 ├── README.md
 ├── backend
-│   ├── db.js
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── schedules.json
-│   ├── server.js
-├
-├── frontend
-│   ├── README.md
-│   ├── components.json
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── src
-│   │   ├── App.css
-│   │   ├── App.tsx
-│   │   ├── components
-│   │   │   ├── AddBabyForm.tsx
-│   │   │   ├── ColumnResizer.tsx
-│   │   │   ├── LoginForm.tsx
-│   │   │   ├── ProfileForm.tsx
-│   │   │   ├── ResetPasswordForm.tsx
-│   │   │   ├── SignUpForm.tsx
-│   │   │   ├── calculateSchedule.tsx
-│   │   │   ├── columns.tsx
-│   │   │   ├── data-table.tsx
-│   │   │   ├── mode-toggle.tsx
-│   │   │   ├── theme-provider.tsx
-│   │   │   └── ui
-│   │   ├── index.css
-│   │   ├── lib
-│   │   │   └── utils.ts
-│   │   ├── main.tsx
-│   │   └── vite-env.d.ts
-│   ├── tsconfig.app.json
-│   ├── tsconfig.json
-│   ├── tsconfig.node.json
-│   └── vite.config.ts
+│   ├── db.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── schedules.json
+│   └── server.js
+└── frontend
+    ├── README.md
+    ├── components.json
+    ├── eslint.config.js
+    ├── index.html
+    ├── package-lock.json
+    ├── package.json
+    ├── src
+    │   ├── App.css
+    │   ├── App.tsx
+    │   ├── components
+    │   │   ├── AddBabyForm.tsx
+    │   │   ├── ColumnResizer.tsx
+    │   │   ├── LoginForm.tsx
+    │   │   ├── ProfileForm.tsx
+    │   │   ├── ResetPasswordForm.tsx
+    │   │   ├── SignUpForm.tsx
+    │   │   ├── calculateSchedule.tsx
+    │   │   ├── columns.tsx
+    │   │   ├── data-table.tsx
+    │   │   ├── mode-toggle.tsx
+    │   │   ├── theme-provider.tsx
+    │   │   └── ui
+    │   ├── index.css
+    │   ├── lib
+    │   │   └── utils.ts
+    │   ├── main.tsx
+    │   └── vite-env.d.ts
+    ├── tsconfig.app.json
+    ├── tsconfig.json
+    ├── tsconfig.node.json
+    └── vite.config.ts
 
 ## Getting Started
 
