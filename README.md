@@ -45,11 +45,11 @@ A full-stack application that help mothers track and schedule their babies' vacc
     │   │   ├── ProfileForm.tsx
     │   │   ├── ResetPasswordForm.tsx
     │   │   ├── SignUpForm.tsx
-    │   │   ├── calculateSchedule.tsx
-    │   │   ├── columns.tsx
-    │   │   ├── data-table.tsx
-    │   │   ├── mode-toggle.tsx
-    │   │   ├── theme-provider.tsx
+    │   │   ├── CalculateSchedule.tsx
+    │   │   ├── Columns.tsx
+    │   │   ├── DataTable.tsx
+    │   │   ├── ModeToggle.tsx
+    │   │   ├── ThemeProvider.tsx
     │   │   └── ui
     │   ├── index.css
     │   ├── lib
