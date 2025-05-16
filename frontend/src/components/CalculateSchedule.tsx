@@ -1,4 +1,4 @@
-import type { Vaccination } from "./columns"
+import type { Vaccination } from "./Columns"
 
 export function calculateVaccinationSchedule<T extends Vaccination>(
     schedule: T[],

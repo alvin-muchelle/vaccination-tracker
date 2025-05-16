@@ -3,7 +3,7 @@ import { FilterIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
 import { Checkbox } from "./ui/checkbox"
-import { formatDateWithOrdinal } from "./calculateSchedule"
+import { formatDateWithOrdinal } from "./CalculateSchedule"
 
 export type Vaccination = {
   age: string

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import * as React from "react"
 import { useState, useEffect } from 'react';
 import { ColumnResizer } from "./ColumnResizer"
-import { calculateVaccinationSchedule } from "./calculateSchedule"
+import { calculateVaccinationSchedule } from "./CalculateSchedule"
 import { CalendarIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table.tsx"
-import { Vaccination } from "./columns";
+import { Vaccination } from "./Columns";
 
 interface DataTableProps {
   columns: ColumnDef<Vaccination, any>[]

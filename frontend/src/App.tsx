@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { ThemeProvider } from "@/components/theme-provider";
-import { ModeToggle } from "./components/mode-toggle";
-import { DataTable } from "./components/data-table";
-import { columns } from "./components/columns";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ModeToggle } from "./components/ModeToggle";
+import { DataTable } from "./components/DataTable";
+import { columns } from "./components/Columns";
 import { SignupForm } from "./components/SignUpForm";
 import { LoginForm } from "./components/LoginForm";
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { ResetPasswordForm } from "./components/ResetPasswordForm";
 import { ProfileForm } from "./components/ProfileForm";
 import { AddBabyForm } from "./components/AddBabyForm";
 import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
-import type { Vaccination } from "./components/columns";
+import type { Vaccination } from "./components/Columns";
 import { toast } from "sonner";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL as string;
